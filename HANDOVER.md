@@ -1,11 +1,87 @@
 # セッション引き継ぎノート
 
-> 最終更新: 2026-04-27（Auto Mode による1セッション通し実装）
+> 最終更新: 2026-04-27 セッション 2（実機検証 → デザイン全面再構築 → Phase 2 完了）
 > 引き継ぎ対象: AIアプリ開発ナレッジ共有ハブ MVP（PoC: ローカルDocker / 本番想定: Firebase Blaze）
 
 ---
 
-## 今回やったこと
+## セッション 2（2026-04-27 後半）でやったこと
+
+### 1. MVP 実機検証 + 発見した不具合の修正
+HANDOVER.md セッション 1 で「未着手」だった検証項目を全て実行：
+- Docker 起動 / `pnpm install` / lint / unit / rules / build / seed をすべて完走
+- 検証で発覚した 7 件の不具合を `fix(verify):` として 1 コミットに集約：
+  - `docker-compose.yml` の minio タグが docker.io から削除されていた → `:latest`
+  - `searchByFields` のジェネリック制約が厳しすぎてドメイン型と噛み合わない
+  - `MyPage.tsx` の uid 未定義時の型エラー（4 箇所）
+  - `tagsSchema` が空文字を validate 前に reject（要件「空除去」と矛盾）
+  - rules テストの emulator host がハードコード（Docker 内では到達できない）
+  - vitest `--dir` フラグが include パターンと両立しない
+  - rules テストの並列実行が `clearFirestore()` でレース → `--no-file-parallelism`
+- `tsconfig.json` に `noEmit: true` を追加（`tsc -b` で `.js` が emit されていた問題）
+
+### 2. Vite HMR の極端遅延を解決
+`server.watch.usePolling: true` + `interval: 500ms` が CPU を 58% 飽和させ、HTML 応答を
+11〜13 秒ブロックしていた。
+- 一旦 `usePolling` を OFF（HTML 応答 8ms に改善）→ HMR が動かない問題が顕在化
+- 最終的に `usePolling: true, interval: 5000ms` + watch ignored を 10 件に拡大して両立
+  （HMR 反映 0〜5 秒、HTML warm 10〜140ms、CPU 56%）
+- `hmr.clientPort: 3200` を明示してホスト→コンテナのポート shift にも対応
+
+### 3. デザイン全面再構築（プロトタイプとの大乖離を解消）
+ユーザーから「特にトップ画面が当初イメージと全然違う」との指摘。
+`design-reference/original-bundle/ai-web/project/screenshots/01〜10.png` を正本として
+**ホーム / シェル / 一覧 4 / 詳細 4 / マイページを全面リライト**。
+
+#### feat(home+shell): ホーム・シェル + Tweaks パネル
+- **ホーム**: `home-hero` 2カラム（タイトル「流さない、**蓄積する**」+ 4 hero-action |
+  metric-grid 4 セル + flow-diagram 4 ステップ）+ `home-grid` 2カラム
+  （link-row / qa-row / app-row | note-row + project-row）
+- **サイドバー**: ブランドマーク + 検索ボックス（⌘K）+ 3 セクション
+  （ワークスペース / 整理 / あなた）+ 下部 Avatar
+- **トップバー**: パンくず + 再読込 / +検証メモ / +URLを共有 / ログアウト
+- **Tweaks パネル**（右下フローティング）: ライト/ダーク + アンバー/インディゴ/フォレスト
+  + 標準/コンパクト。`localStorage` 永続化、`document.body.dataset` で適用
+- 補助: SVG Icon コンポーネント、`timeAgo` / `sourceShort` ヘルパー
+
+#### feat(pages): 一覧 / 詳細 / マイページを再構築
+- 共通: `PageHeader`（page-eyebrow + title + sub + actions）/ `FilterBar`（chip 形式）
+- 行: `LinkRow` / `QARow` / `NoteRow` / `AppRow` を `src/components/rows/` に切り出して
+  ホーム・一覧・お気に入り・プロジェクト詳細で再利用
+- 詳細: `detail-layout` 2カラム + `detail-aside` の aside-section 列
+- マイページ: `me-header`（avatar 72px + 縦 3 ボタン）+ `me-stats` 5 セル + `me-tabs` 7 タブ
+  + `vis-switch` + `me-row`
+- `useUser` hook（TanStack Query で User キャッシュ）追加して avatar 表示を統一
+
+### 4. Phase 2 完了: プロジェクト / タグ / お気に入り / 管理
+これまで disabled だった整理セクションを実ページとして実装。
+- **プロジェクト**: card grid + 詳細（紐づく link/qa/note/app をセクション別表示）
+- **タグ**: type 別グルーピング、利用件数を集計表示
+- **お気に入り**: `favorites/{uid}/items/{type_id}` サブコレクション + `FavoriteButton`
+  を 4 つの詳細ページ aside に追加
+- **管理**: design 通りプレースホルダ（profile.role === '管理者' でゲート）
+- 新規 DB レイヤ: `projectsDb` / `tagsDb` / `favoritesDb`
+- 既存 Firestore Rules（favorites / tags / projects）のテストは全件パス
+
+### 5. ドキュメント整備
+- `docs/runbooks/test-accounts.md` を新設（dev-setup 末尾から専用 runbook へ切り出し、
+  各ユーザーの保有データ・動作確認シナリオも併記）
+- README / CLAUDE.md からリンク追加
+
+### 6. 細かいバグ修正
+- `FavoritesPage`: TanStack Query v5 で `enabled:false` 時も `isPending:true` になる仕様
+  により、お気に入り 0 件でスピナー無限ループ → `isFetching` 判定に変更
+- `App.tsx` のルーティング: 詳細ページのパス（`notes:id` → `notes/:id` 等）の typo 修正
+
+### 7. コミットメッセージ規約変更
+ユーザーの指示で **commit message も日本語必須**（type prefix のみ英語維持）。
+これに従い直近 2 コミットを `git reset --hard` + `cherry-pick --no-commit` で書き直し
+（差分 0 ファイルで安全にメッセージのみ更新）。以降のコミットは全て日本語。
+グローバルメモリ `feedback_japanese_required.md` に記録。
+
+---
+
+## セッション 1（MVP 初期実装）でやったこと
 
 ### 0. デザインバンドルの取得と理解
 - Claude Design (`claude.ai/design`) の handoff URL から gzip tar をダウンロード・展開
@@ -126,33 +202,83 @@
 
 ## 次セッションへの注意点
 
-### まだ手をつけていない確認・実機検証
-- `docker compose up -d` の実機動作確認（`pnpm install` の依存解決、emulator 起動、bucket 自動作成、og-proxy ヘルスチェック）
-- TypeScript コンパイル（`pnpm lint` = `tsc --noEmit`）の通過確認
-- Vitest 実行（`pnpm test` および `pnpm test:rules`）の通過確認
-- ブラウザ動作確認（サインアップ → ログイン → 各画面 → 公開切替 → コメント投稿）
-- ピクセルパーフェクト回帰（プロトタイプ HTML を並列表示し 1280px viewport で比較）
+### 完了確認済み（セッション 2 で全部消化した項目）
+- ✅ Docker stack 起動 + 各サービスのヘルスチェック
+- ✅ TypeScript（`pnpm lint`）通過
+- ✅ Unit テスト 43/43、Rules テスト 41/41
+- ✅ Production ビルド成功（gzip 後 約 260KB）
+- ✅ ブラウザ動作確認（サインアップ → ログイン → 各画面 → 公開切替 → お気に入り → コメント）
+- ✅ design 全 9 画面（home / links / qa / notes / apps / projects / tags / favorites / mypage）のピクセル整合
+- ✅ admin（10）はプレースホルダで設計通り
+- ✅ Tweaks パネル（テーマ / アクセント / 情報密度）動作
+
+### まだ手をつけていない作業
+- **E2E テスト**: 主要フロー（サインアップ → 投稿 → コメント → 採用 → お気に入り → 公開切替）
+  を Playwright で網羅。`tools/scripts/verify-list-pages.mjs` のような検証スクリプトはあるが
+  E2E テストとして体系化されていない
+- **本番 Blaze 移行**: `docs/runbooks/deploy.md` の 10 ステップは未実行。予算アラート設定 +
+  Cloud Functions（OG/集計トリガー）の Cloud Functions 移植が要
+- **Cloud Functions 集計**: `answerCount`/`stats.likes`/タグ件数 等は MVP ではクライアント
+  集計。Phase 3 でトリガー化する想定（`docs/security.md` 参照）
+- **管理画面の中身**: ユーザー一覧 / ロール変更 / タグマスタ管理 / 投稿モデレーション
+- **マイページのお気に入りタブ・下書きタブ**: 現状 `disabled`（タブのみ実装、中身なし）
 
 ### 既知の留意点
-- **Vite HMR + Docker(Windows)**: `usePolling: true` 設定済み、CPU 負荷高めなので不要時は `docker compose stop app`
-- **Firestore Emulator export**: `docker compose down` の SIGTERM タイムアウトで失敗する可能性。`stop_grace_period: 30s` を設定済みだが、確実に保存したい場合は `docker compose exec firebase-emulator firebase emulators:export ./.emulator-data --force` を先に実行
-- **`tools/scripts/seed.ts` 安全装置**: `env-guard.ts` が `FIRESTORE_EMULATOR_HOST` 未設定 / project id に "prod" を含む場合に abort
-- **Auth Emulator の ID Token は本物と署名検証が異なる** → 本番 Cloud Functions 接続時に必ず staging Firebase プロジェクトでドライラン
+- **Vite HMR**: `usePolling: true, interval: 5000ms`。バランス調整済みで保存後 0〜5 秒で
+  反映。500ms に下げると CPU 飽和 + HTML 応答秒単位ブロックの副作用が出るので戻さないこと
+- **TanStack Query v5 の `enabled:false` は `isPending:true`**: 条件付きフェッチで
+  ロード判定する場合は `isFetching` を使う（FavoritesPage で踏んだ罠）
+- **ホーム metric の delta 計算**: `(visibility, createdAt >=)` の range 集計は
+  `getCountFromServer`。本番では `firestore.indexes.json` の既存 composite index で動くはず
+  だが、staging で要確認
+- **コミットメッセージは日本語必須**（type prefix のみ英語）。グローバルメモリにルール記録済
+- **Firestore Emulator export**: `docker compose down` の SIGTERM タイムアウトで失敗する
+  可能性。`stop_grace_period: 30s` 設定済みだが、確実に保存したい場合は手動 export を先に
+- **`tools/scripts/seed.ts` 安全装置**: `env-guard.ts` が `FIRESTORE_EMULATOR_HOST` 未設定
+  / project id に "prod" を含む場合に abort
+- **Auth Emulator の ID Token は本物と署名検証が異なる** → 本番 Cloud Functions 接続時に
+  必ず staging Firebase プロジェクトでドライラン
+
+### テストアカウント
+詳細は [docs/runbooks/test-accounts.md](docs/runbooks/test-accounts.md)。
+全員パスワード `testtest`：
+- `sato.k@example.ac.jp`（DX推進、private データあり）
+- `matsuoka.m@example.ac.jp`（情報支援、採用済み回答 a3-1 の作者）
+- `kimura.r@example.ac.jp`（DX推進、解決済み質問 q3 の作者）
 
 ### 本番 Blaze 移行時の必須作業
-[`docs/runbooks/deploy.md`](docs/runbooks/deploy.md) の10ステップ全項目（予算アラート + 自動停止 Function、Identity Platform、blocking trigger、App Check、Storage Rules、API key restrictions、CSP、staging ドライラン）。
+[`docs/runbooks/deploy.md`](docs/runbooks/deploy.md) の 10 ステップ全項目（予算アラート +
+自動停止 Function、Identity Platform、blocking trigger、App Check、Storage Rules、
+API key restrictions、CSP、staging ドライラン）。
 
 ### コミット直近の状態
 ```
+c2d0edc fix(favorites): 0件時にスピナーが永久に回る問題を修正
+18ce515 fix(vite): HMR が動かない問題を解決（polling 復活 + interval 緩和）
+d7f896b feat(phase2): プロジェクト / タグ / お気に入り / 管理画面を実装
+50e188b docs: テストアカウント一覧を専用 runbook に切り出し
+2f538ff feat(pages): 一覧 / 詳細 / マイページを Claude Design に合わせて再構築
+d32b304 feat(home+shell): ホーム・シェルを Claude Design に合わせて再構築 + Tweaks パネル追加
+ac3d0cb fix(verify): resolve issues found during MVP runtime verification
+9329196 chore(structure): reorganize into Claude Code best-practice layout
 16efaf5 chore(docker): shift host ports +200 to avoid collision with allplan_claude
-813b57d docs+test+seed: complete MVP with full sample data, unit tests, and docs
-b0bf803 feat(mypage): profile + metrics + 5 tabs + visibility toggle
-6e0b171 feat(qa+notes+apps): list and detail pages for remaining MVP entities
-8f6babd feat(links+compose): URL sharing list, detail, and unified compose modal
-dfede9f feat(home): implement dashboard with shared-only feeds
-5f816c6 feat(auth+shell): wire Firebase Auth, routing, and app shell
-1d4d556 feat(security): enforce strict Firestore Rules with full test coverage
-972eace feat: add Firebase client, Storage abstraction, types, and seed scaffold
-aff5a47 feat(docker): add PoC dev environment with og-proxy and MinIO
-20ac92c chore: initial project setup with design reference and docs
+... (以下セッション 1 のコミット)
 ```
+
+### 主要ファイル位置（セッション 2 で追加・大改修されたもの）
+- `src/pages/HomePage.tsx` — 全面書き換え
+- `src/pages/{links,qa,notes,apps}/{*Page,*DetailPage}.tsx` — 全面書き換え
+- `src/pages/MyPage.tsx` — 全面書き換え
+- `src/pages/{projects,tags,favorites,admin}/` — 新規（Phase 2）
+- `src/components/rows/` — 新規（LinkRow / QARow / NoteRow / AppRow を切り出し）
+- `src/components/shared/{PageHeader,FilterBar,Icon,FavoriteButton}.tsx` — 新規
+- `src/components/shell/{Sidebar,Topbar,Avatar}.tsx` — 全面書き換え
+- `src/components/tweaks/TweaksPanel.tsx` — 新規
+- `src/components/home/HeroActions.tsx`、`RecentProjects.tsx` — 新規
+- `src/components/home/QuickActions.tsx` — 削除（HeroActions に置換）
+- `src/lib/db/{projects,tags,favorites}.ts` — 新規
+- `src/lib/firebase/use-user.ts` — 新規
+- `src/lib/utils/{time,source,tweaks}.ts` — 新規
+- `src/extra.css` — Tweaks UI / ダーク / アクセント追加（+142 行）
+- `vite.config.ts` — HMR polling バランス調整
+- `docs/runbooks/test-accounts.md` — 新規
