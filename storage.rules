@@ -1,0 +1,47 @@
+rules_version = '2';
+// 本番 Firebase Storage 用のルール（PoC は MinIO 経由のため、本ルールは Blaze 移行時に有効化）
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signedIn() { return request.auth != null; }
+
+    // 各ユーザーのアバター画像
+    match /users/{uid}/avatar/{file} {
+      allow read: if signedIn();
+      allow write: if signedIn() && request.auth.uid == uid
+        && request.resource.size < 2 * 1024 * 1024
+        && request.resource.contentType.matches('image/(jpeg|png|webp)')
+        && !file.matches('.*\\.svg$');
+    }
+
+    // リンクのサムネイル
+    match /links/{id}/thumb/{file} {
+      allow read: if signedIn();
+      allow write: if signedIn()
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/(jpeg|png|webp|gif)')
+        && !file.matches('.*\\.svg$');
+    }
+
+    // 検証メモの添付ファイル
+    match /notes/{id}/attachments/{file} {
+      allow read: if signedIn();
+      allow write: if signedIn()
+        && request.resource.size < 10 * 1024 * 1024
+        && !request.resource.contentType.matches('application/x-(msdownload|sh|exe)')
+        && !file.matches('.*\\.(exe|sh|bat|ps1|js|html|svg)$');
+    }
+
+    // アプリのサムネイル
+    match /apps/{id}/thumb/{file} {
+      allow read: if signedIn();
+      allow write: if signedIn()
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/(jpeg|png|webp)');
+    }
+
+    // 上記以外は拒否
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

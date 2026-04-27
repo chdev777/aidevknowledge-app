@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:api.anthropic.com)",
+      "Bash(mkdir -p /tmp/design-extract)",
+      "Read(//tmp/**)",
+      "Bash(cp \"C:\\\\Users\\\\ipc_administrator\\\\.claude\\\\projects\\\\C--ai-claude-aidevknowledge\\\\179a3c2a-44eb-41f0-a875-210541745dcf\\\\tool-results\\\\webfetch-1777247790614-ifz8or.bin\" design.gz)",
+      "Bash(gunzip -f design.gz)",
+      "Bash(tar -xf design)"
+    ]
+  }
+}
