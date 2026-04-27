@@ -24,9 +24,9 @@ const PRIMARY: NavDef[] = [
 ];
 
 const ORGANIZE: NavDef[] = [
-  { to: '/', label: 'プロジェクト', icon: 'project', disabled: true },
-  { to: '/', label: 'タグ', icon: 'tag', disabled: true },
-  { to: '/', label: 'お気に入り', icon: 'star', disabled: true },
+  { to: '/projects', label: 'プロジェクト', icon: 'project' },
+  { to: '/tags', label: 'タグ', icon: 'tag' },
+  { to: '/favorites', label: 'お気に入り', icon: 'star' },
 ];
 
 async function countShared(col: string): Promise<number> {
@@ -90,15 +90,14 @@ export function Sidebar() {
       <div className="nav-section" style={{ paddingTop: 0 }}>
         <div className="nav-section-title">整理</div>
         {ORGANIZE.map((item) => (
-          <div
+          <NavLink
             key={item.label}
-            className="nav-item"
-            style={{ opacity: item.disabled ? 0.4 : 1, cursor: item.disabled ? 'not-allowed' : 'pointer' }}
-            title={item.disabled ? '今後実装予定' : undefined}
+            to={item.to}
+            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
           >
             <Icon name={item.icon} size={14} style={{ flexShrink: 0 }} />
             <span>{item.label}</span>
-          </div>
+          </NavLink>
         ))}
       </div>
 
@@ -111,14 +110,13 @@ export function Sidebar() {
           <Icon name="user" size={14} style={{ flexShrink: 0 }} />
           <span>マイページ</span>
         </NavLink>
-        <div
-          className="nav-item"
-          style={{ opacity: 0.4, cursor: 'not-allowed' }}
-          title="今後実装予定"
+        <NavLink
+          to="/admin"
+          className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
         >
           <Icon name="admin" size={14} style={{ flexShrink: 0 }} />
           <span>設定</span>
-        </div>
+        </NavLink>
       </div>
 
       {profile && (

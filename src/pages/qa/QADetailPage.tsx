@@ -8,6 +8,7 @@ import { Avatar } from '../../components/shell/Avatar.js';
 import { Markdown } from '../../components/shared/Markdown.js';
 import { Spinner } from '../../components/shared/Spinner.js';
 import { Icon } from '../../components/shared/Icon.js';
+import { FavoriteButton } from '../../components/shared/FavoriteButton.js';
 import { answerInputSchema } from '../../lib/schemas/question.js';
 import { toAppError } from '../../lib/utils/error.js';
 import { timeAgo } from '../../lib/utils/time.js';
@@ -139,6 +140,9 @@ export function QADetailPage() {
             <div className="aside-value mono" style={{ fontSize: 12 }}>
               {q.createdAt.toLocaleString('ja-JP')}
             </div>
+          </div>
+          <div className="aside-section">
+            <FavoriteButton targetType="question" targetId={id} fullWidth />
           </div>
         </aside>
       </div>

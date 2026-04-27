@@ -7,6 +7,7 @@ import { CommentList } from '../../components/comments/CommentList.js';
 import { CommentComposer } from '../../components/comments/CommentComposer.js';
 import { Spinner } from '../../components/shared/Spinner.js';
 import { Icon } from '../../components/shared/Icon.js';
+import { FavoriteButton } from '../../components/shared/FavoriteButton.js';
 import { ForbiddenPage } from '../ForbiddenPage.js';
 import { isSafeHref } from '../../lib/utils/url.js';
 import { timeAgo } from '../../lib/utils/time.js';
@@ -127,6 +128,9 @@ export function LinkDetailPage() {
               {l.createdAt.toLocaleString('ja-JP')}
             </span>
           </AsideRow>
+          <div className="aside-section">
+            <FavoriteButton targetType="link" targetId={l.id} fullWidth />
+          </div>
         </aside>
       </div>
     </div>

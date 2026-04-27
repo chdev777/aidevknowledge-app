@@ -7,6 +7,7 @@ import { Markdown } from '../../components/shared/Markdown.js';
 import { Spinner } from '../../components/shared/Spinner.js';
 import { CommentList } from '../../components/comments/CommentList.js';
 import { CommentComposer } from '../../components/comments/CommentComposer.js';
+import { FavoriteButton } from '../../components/shared/FavoriteButton.js';
 import { ForbiddenPage } from '../ForbiddenPage.js';
 import { timeAgo } from '../../lib/utils/time.js';
 
@@ -110,6 +111,9 @@ export function NoteDetailPage() {
             <div className="aside-value mono" style={{ fontSize: 12 }}>
               {n.createdAt.toLocaleString('ja-JP')}
             </div>
+          </div>
+          <div className="aside-section">
+            <FavoriteButton targetType="note" targetId={n.id} fullWidth />
           </div>
         </aside>
       </div>

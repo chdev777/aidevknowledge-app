@@ -8,6 +8,7 @@ import { Spinner } from '../../components/shared/Spinner.js';
 import { Icon } from '../../components/shared/Icon.js';
 import { CommentList } from '../../components/comments/CommentList.js';
 import { CommentComposer } from '../../components/comments/CommentComposer.js';
+import { FavoriteButton } from '../../components/shared/FavoriteButton.js';
 import { ForbiddenPage } from '../ForbiddenPage.js';
 import { isSafeHref } from '../../lib/utils/url.js';
 
@@ -185,6 +186,9 @@ export function AppDetailPage() {
               </a>
             </div>
           )}
+          <div className="aside-section">
+            <FavoriteButton targetType="app" targetId={a.id} fullWidth />
+          </div>
         </aside>
       </div>
     </div>

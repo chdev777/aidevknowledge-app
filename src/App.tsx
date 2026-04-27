@@ -17,6 +17,11 @@ import { NoteDetailPage } from './pages/notes/NoteDetailPage.js';
 import { AppsPage } from './pages/apps/AppsPage.js';
 import { AppDetailPage } from './pages/apps/AppDetailPage.js';
 import { MyPage } from './pages/MyPage.js';
+import { ProjectsPage } from './pages/projects/ProjectsPage.js';
+import { ProjectDetailPage } from './pages/projects/ProjectDetailPage.js';
+import { TagsPage } from './pages/tags/TagsPage.js';
+import { FavoritesPage } from './pages/favorites/FavoritesPage.js';
+import { AdminPage } from './pages/admin/AdminPage.js';
 import { ForbiddenPage } from './pages/ForbiddenPage.js';
 import { NotFoundPage } from './pages/NotFoundPage.js';
 
@@ -59,6 +64,11 @@ export function App() {
                 <Route path="apps" element={<AppsPage />} />
                 <Route path="apps/:id" element={<AppDetailPage />} />
                 <Route path="me" element={<MyPage />} />
+                <Route path="projects" element={<ProjectsPage />} />
+                <Route path="projects/:id" element={<ProjectDetailPage />} />
+                <Route path="tags" element={<TagsPage />} />
+                <Route path="favorites" element={<FavoritesPage />} />
+                <Route path="admin" element={<AdminPage />} />
                 <Route path="forbidden" element={<ForbiddenPage />} />
                 <Route path="*" element={<NotFoundPage />} />
               </Route>
