@@ -1,23 +1,36 @@
 import { useAuth } from '../lib/firebase/auth-context.js';
+import { QuickActions } from '../components/home/QuickActions.js';
+import { KnowledgeFlow } from '../components/home/KnowledgeFlow.js';
+import { RecentLinks } from '../components/home/RecentLinks.js';
+import { UnansweredQs } from '../components/home/UnansweredQs.js';
+import { RecentNotes } from '../components/home/RecentNotes.js';
+import { RecentApps } from '../components/home/RecentApps.js';
+import { Metrics } from '../components/home/Metrics.js';
 
 export function HomePage() {
   const { profile } = useAuth();
   return (
-    <div className="page">
+    <div className="page page-home">
       <header className="page-head">
-        <h1 className="page-title">ホーム</h1>
+        <h1 className="page-title">AIアプリ開発ナレッジ共有ハブ</h1>
         <p className="page-subtitle">
-          {profile?.name} さん、ようこそ。
+          {profile?.name ? `${profile.name} さん` : ''} ─
+          流れない、蓄積されるナレッジ基盤
         </p>
       </header>
-      <section className="page-section">
-        <div className="empty-state">
-          <div className="empty-state-title">ダッシュボードはStep 7で実装します</div>
-          <div className="empty-state-desc">
-            最近のURL / 未回答質問 / 検証メモ / 作成アプリ / メトリクスを表示予定。
-          </div>
-        </div>
-      </section>
+
+      <QuickActions />
+      <KnowledgeFlow />
+      <Metrics />
+
+      <div className="home-columns">
+        <RecentLinks />
+        <UnansweredQs />
+      </div>
+      <div className="home-columns">
+        <RecentNotes />
+        <RecentApps />
+      </div>
     </div>
   );
 }
