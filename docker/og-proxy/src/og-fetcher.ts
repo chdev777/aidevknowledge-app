@@ -26,13 +26,26 @@ export async function fetchOg(targetUrl: string): Promise<OgMeta> {
     throw new Error(`refused: private or metadata IP (${address})`);
   }
 
+  // X / Twitter は非ブラウザ UA に対し空 HTML を返すため、
+  // 公開oEmbed (publish.twitter.com) を優先で叩いて投稿者・本文を取り出す。
+  if (parsed.hostname === 'x.com' || parsed.hostname === 'twitter.com' ||
+      parsed.hostname.endsWith('.x.com') || parsed.hostname.endsWith('.twitter.com')) {
+    const oembed = await fetchTwitterOEmbed(targetUrl).catch(() => null);
+    if (oembed) return oembed;
+    // oEmbed が失敗（古い・削除・非公開ツイート）でも下の通常 fetch にフォールバック
+  }
+
   const { statusCode, body, headers } = await request(targetUrl, {
     method: 'GET',
     headers: {
-      'user-agent': 'Mozilla/5.0 (compatible; aidev-knowledge-ogfetch/0.1)',
+      // 主要サイトは Bot UA だと簡易ページを返すので Chrome を装う
+      'user-agent':
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
+        '(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
       accept: 'text/html,application/xhtml+xml',
+      'accept-language': 'ja,en;q=0.9',
     },
-    bodyTimeout: 5000,
+    bodyTimeout: 8000,
     headersTimeout: 5000,
     maxRedirections: 3,
   });
@@ -69,6 +82,49 @@ export async function fetchOg(targetUrl: string): Promise<OgMeta> {
       meta('twitter:image', 'name') ??
       undefined,
     siteName: meta('og:site_name') ?? undefined,
+  };
+}
+
+/**
+ * Twitter oEmbed: 公開ツイートの author / text / 投稿者URL を取得
+ * https://publish.twitter.com/oembed?url=<URL>
+ */
+async function fetchTwitterOEmbed(targetUrl: string): Promise<OgMeta | null> {
+  const ep = `https://publish.twitter.com/oembed?url=${encodeURIComponent(targetUrl)}&omit_script=true`;
+  const { statusCode, body } = await request(ep, {
+    method: 'GET',
+    headers: { accept: 'application/json' },
+    bodyTimeout: 5000,
+    headersTimeout: 5000,
+    maxRedirections: 2,
+  });
+  if (statusCode !== 200) return null;
+  const json = (await body.json()) as {
+    author_name?: string;
+    author_url?: string;
+    html?: string;
+    title?: string;
+  };
+  // html は <blockquote class="twitter-tweet">…</blockquote> 形式
+  // 中身のテキストを抽出して description にする
+  const text = (() => {
+    if (!json.html) return undefined;
+    const m = /<p[^>]*>([\s\S]*?)<\/p>/.exec(json.html);
+    if (!m || !m[1]) return undefined;
+    return m[1]
+      .replace(/<a[^>]*>/g, '')
+      .replace(/<\/a>/g, '')
+      .replace(/<br\s*\/?>/gi, ' ')
+      .replace(/&[a-z#0-9]+;/gi, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  })();
+
+  return {
+    url: targetUrl,
+    title: json.author_name ? `${json.author_name} (X)` : 'X (Twitter)',
+    description: text,
+    siteName: 'X (formerly Twitter)',
   };
 }
 

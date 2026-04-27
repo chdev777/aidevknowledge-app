@@ -12,7 +12,7 @@ import {
 } from '../../types/link.js';
 import type { Visibility } from '../../types/visibility.js';
 import { detectSourceType, extractDomain, extractYoutubeVideoId, youtubeThumbnailUrl } from '../../lib/utils/url.js';
-import { fetchOg } from '../../lib/utils/og.js';
+import { fetchOg, isOgEmpty, OgFetchError } from '../../lib/utils/og.js';
 import { toAppError } from '../../lib/utils/error.js';
 import { Spinner } from '../shared/Spinner.js';
 import { TagInput } from './TagInput.js';
@@ -48,6 +48,7 @@ export function LinkForm({ onDone }: { onDone: (id: string) => void }) {
   const qc = useQueryClient();
   const [draft, setDraft, clearDraft] = useDraft<DraftState>('link', INITIAL);
   const [error, setError] = useState<string | null>(null);
+  const [metaInfo, setMetaInfo] = useState<string | null>(null);
   const [fetching, setFetching] = useState(false);
 
   const set = <K extends keyof DraftState>(k: K, v: DraftState[K]) =>
@@ -64,13 +65,37 @@ export function LinkForm({ onDone }: { onDone: (id: string) => void }) {
   const fetchMeta = async () => {
     if (!draft.url) return;
     setFetching(true);
+    setMetaInfo(null);
+    setError(null);
     try {
       const og = await fetchOg(draft.url);
-      if (og) {
-        if (og.title && !draft.title) set('title', og.title);
-        if (og.description && !draft.summary) set('summary', og.description);
-        if (og.image && !draft.thumbnailUrl) set('thumbnailUrl', og.image);
+      if (isOgEmpty(og)) {
+        setMetaInfo(
+          'メタ情報が取得できませんでした。サイトが非ブラウザからのアクセスを制限しているか、未公開の可能性があります。タイトル等は手動で入力してください。',
+        );
+        return;
       }
+      const filled: string[] = [];
+      if (og.title && !draft.title) {
+        set('title', og.title);
+        filled.push('タイトル');
+      }
+      if (og.description && !draft.summary) {
+        set('summary', og.description);
+        filled.push('概要');
+      }
+      if (og.image && !draft.thumbnailUrl) {
+        set('thumbnailUrl', og.image);
+        filled.push('サムネイル');
+      }
+      setMetaInfo(
+        filled.length > 0
+          ? `取得しました: ${filled.join(' / ')}`
+          : '既に入力済のため自動入力はスキップしました（取得自体は成功）',
+      );
+    } catch (e: unknown) {
+      const msg = e instanceof OgFetchError ? e.message : '取得に失敗しました';
+      setError(`メタ取得エラー: ${msg}`);
     } finally {
       setFetching(false);
     }
@@ -143,6 +168,14 @@ export function LinkForm({ onDone }: { onDone: (id: string) => void }) {
         >
           {fetching ? <Spinner /> : 'メタ取得'}
         </button>
+        {metaInfo && (
+          <div
+            className="mono"
+            style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 4 }}
+          >
+            {metaInfo}
+          </div>
+        )}
       </label>
 
       <label className="auth-field">
