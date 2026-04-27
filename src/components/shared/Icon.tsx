@@ -16,7 +16,8 @@ export type IconName =
   | 'arrow'
   | 'refresh'
   | 'message'
-  | 'eye';
+  | 'eye'
+  | 'play';
 
 interface Props {
   name: IconName;
@@ -93,6 +94,7 @@ const PATHS: Record<IconName, JSX.Element> = {
       <circle cx="12" cy="12" r="2.5" />
     </>
   ),
+  play: <path d="M7 4l13 8-13 8z" fill="currentColor" />,
 };
 
 export function Icon({ name, size = 14, stroke = 1.5, style }: Props) {

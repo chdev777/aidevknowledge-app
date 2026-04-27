@@ -9,8 +9,9 @@ import { Spinner } from '../../components/shared/Spinner.js';
 import { Icon } from '../../components/shared/Icon.js';
 import { FavoriteButton } from '../../components/shared/FavoriteButton.js';
 import { ForbiddenPage } from '../ForbiddenPage.js';
-import { isSafeHref } from '../../lib/utils/url.js';
+import { extractYoutubeVideoId, isSafeHref } from '../../lib/utils/url.js';
 import { timeAgo } from '../../lib/utils/time.js';
+import { YouTubeEmbed } from '../../components/shared/YouTubeEmbed.js';
 
 export function LinkDetailPage() {
   const { id = '' } = useParams();
@@ -69,26 +70,35 @@ export function LinkDetailPage() {
             </a>
           )}
 
-          {l.thumbnailUrl && (
-            <div style={{ marginBottom: 26 }}>
-              <img
-                src={l.thumbnailUrl}
-                alt=""
-                loading="lazy"
-                style={{
-                  width: '100%',
-                  maxHeight: 360,
-                  objectFit: 'cover',
-                  borderRadius: 8,
-                  border: '1px solid var(--line)',
-                  background: 'var(--bg-2)',
-                }}
-                onError={(e) => {
-                  (e.currentTarget as HTMLImageElement).style.display = 'none';
-                }}
-              />
-            </div>
-          )}
+          {(() => {
+            const videoId = extractYoutubeVideoId(l.url);
+            if (videoId) {
+              return <YouTubeEmbed videoId={videoId} thumbnailUrl={l.thumbnailUrl} />;
+            }
+            if (l.thumbnailUrl) {
+              return (
+                <div style={{ marginBottom: 26 }}>
+                  <img
+                    src={l.thumbnailUrl}
+                    alt=""
+                    loading="lazy"
+                    style={{
+                      width: '100%',
+                      maxHeight: 360,
+                      objectFit: 'cover',
+                      borderRadius: 8,
+                      border: '1px solid var(--line)',
+                      background: 'var(--bg-2)',
+                    }}
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).style.display = 'none';
+                    }}
+                  />
+                </div>
+              );
+            }
+            return null;
+          })()}
 
           {l.summary && (
             <div style={{ marginBottom: 26 }}>
