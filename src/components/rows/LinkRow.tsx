@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { Avatar } from '../shell/Avatar.js';
 import { useUser } from '../../lib/firebase/use-user.js';
-import { sourceShort } from '../../lib/utils/source.js';
+import { SourceIcon, sourceKey } from '../shared/SourceIcon.js';
 import { timeAgo } from '../../lib/utils/time.js';
 import type { Link as LinkDoc } from '../../types/link.js';
 
@@ -11,8 +11,8 @@ export function LinkRow({ link }: { link: LinkDoc }) {
 
   return (
     <div className="link-row" onClick={() => nav(`/links/${link.id}`)}>
-      <div className="link-thumb">
-        <span className="st-label">{sourceShort(link.sourceType)}</span>
+      <div className="link-thumb" data-source={sourceKey(link.sourceType, link.domain)}>
+        <SourceIcon sourceType={link.sourceType} domain={link.domain} />
       </div>
       <div className="link-body">
         <div className="link-title">{link.title}</div>

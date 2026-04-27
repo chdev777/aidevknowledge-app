@@ -17,7 +17,17 @@ export type IconName =
   | 'refresh'
   | 'message'
   | 'eye'
-  | 'play';
+  | 'play'
+  // ブランドロゴ（fill 中心）
+  | 'youtube'
+  | 'github'
+  | 'x'
+  | 'qiita'
+  | 'zenn'
+  // 汎用アイコン
+  | 'doc'
+  | 'book'
+  | 'globe';
 
 interface Props {
   name: IconName;
@@ -95,17 +105,84 @@ const PATHS: Record<IconName, JSX.Element> = {
     </>
   ),
   play: <path d="M7 4l13 8-13 8z" fill="currentColor" />,
+  // YouTube: 角丸長方形 + 三角形
+  youtube: (
+    <>
+      <rect x="3" y="6" width="18" height="12" rx="3" fill="currentColor" stroke="none" />
+      <path d="M10 9.5l5 2.5-5 2.5z" fill="#fff" stroke="none" />
+    </>
+  ),
+  // GitHub: シンプル化した猫マーク
+  github: (
+    <path
+      d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.11-1.46-1.11-1.46-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.89 1.53 2.34 1.09 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02a9.55 9.55 0 0 1 5 0c1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.69-4.57 4.93.36.31.68.92.68 1.85v2.74c0 .27.18.58.69.48A10 10 0 0 0 12 2z"
+      fill="currentColor"
+      stroke="none"
+    />
+  ),
+  // X (旧 Twitter): バツ印（公式 X ロゴ簡略版）
+  x: (
+    <path
+      d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.16 17.52h1.833L7.084 4.126H5.117z"
+      fill="currentColor"
+      stroke="none"
+    />
+  ),
+  // Qiita: 三角形 + 円弧（簡略化）
+  qiita: (
+    <>
+      <circle cx="12" cy="12" r="10" fill="currentColor" stroke="none" />
+      <path
+        d="M12 5a7 7 0 0 1 4.95 11.95l-2.12-2.12a4 4 0 1 0-5.66 0L7.05 16.95A7 7 0 0 1 12 5z"
+        fill="#fff"
+        stroke="none"
+      />
+    </>
+  ),
+  // Zenn: 山型 Z
+  zenn: (
+    <>
+      <rect x="3" y="3" width="18" height="18" rx="3" fill="currentColor" stroke="none" />
+      <path d="M7 17L13 6h2l-6 11zm5-1l4-7h2l-4 7z" fill="#fff" stroke="none" />
+    </>
+  ),
+  // 汎用 doc（記事）
+  doc: (
+    <>
+      <path d="M14 3H6v18h12V7z" />
+      <path d="M14 3v4h4" />
+      <path d="M9 12h6M9 16h6M9 8h2" />
+    </>
+  ),
+  // 汎用 book（公式Docs）
+  book: (
+    <>
+      <path d="M4 4h6a4 4 0 0 1 4 4v13a3 3 0 0 0-3-3H4z" />
+      <path d="M20 4h-6a4 4 0 0 0-4 4v13a3 3 0 0 1 3-3h7z" />
+    </>
+  ),
+  // 汎用 globe（Web）
+  globe: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" />
+    </>
+  ),
 };
 
+// ブランドロゴは fill 中心なので Icon コンポーネントに stroke を強制させない
+const FILL_ICONS = new Set<IconName>(['play', 'youtube', 'github', 'x', 'qiita', 'zenn']);
+
 export function Icon({ name, size = 14, stroke = 1.5, style }: Props) {
+  const isFill = FILL_ICONS.has(name);
   return (
     <svg
       width={size}
       height={size}
       viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={stroke}
+      fill={isFill ? 'currentColor' : 'none'}
+      stroke={isFill ? 'none' : 'currentColor'}
+      strokeWidth={isFill ? 0 : stroke}
       strokeLinecap="round"
       strokeLinejoin="round"
       style={style}

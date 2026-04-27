@@ -13,8 +13,8 @@ import { VisibilityToggle } from '../components/me/VisibilityToggle.js';
 import { Spinner } from '../components/shared/Spinner.js';
 import { EmptyState } from '../components/shared/EmptyState.js';
 import { Icon, type IconName } from '../components/shared/Icon.js';
+import { SourceIcon } from '../components/shared/SourceIcon.js';
 import { CommentTypeBadge } from '../components/comments/CommentTypeBadge.js';
-import { sourceShort } from '../lib/utils/source.js';
 import { timeAgo } from '../lib/utils/time.js';
 import type { Visibility } from '../types/visibility.js';
 import type { Link as LinkDoc } from '../types/link.js';
@@ -328,7 +328,9 @@ function LinkMeRow({ link, uid }: { link: LinkDoc; uid: string }) {
   const nav = useNavigate();
   return (
     <div className="me-row">
-      <div className="me-row-icon">{sourceShort(link.sourceType)}</div>
+      <div className="me-row-icon">
+        <SourceIcon sourceType={link.sourceType} domain={link.domain} size={18} />
+      </div>
       <div style={{ minWidth: 0 }}>
         <div className="me-row-title" onClick={() => nav(`/links/${link.id}`)}>{link.title}</div>
         <div className="me-row-meta">

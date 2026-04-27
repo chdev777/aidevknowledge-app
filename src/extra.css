@@ -1478,3 +1478,55 @@ body[data-theme="dark"][data-accent="forest"] {
   color: var(--ink);
   box-shadow: 0 1px 2px oklch(0.22 0.01 60 / 0.08);
 }
+
+/* ============================================================
+   link-thumb のブランド別背景色（SourceIcon と組み合わせ）
+   data-source 属性は SourceIcon.sourceKey() から渡される
+   ============================================================ */
+.link-thumb[data-source="youtube"] {
+  background: oklch(0.97 0.04 27);
+  border-color: oklch(0.85 0.06 27);
+}
+.link-thumb[data-source="github"] {
+  background: var(--bg-2);
+  border-color: var(--line);
+}
+.link-thumb[data-source="x"] {
+  background: var(--bg-2);
+  border-color: var(--line);
+}
+.link-thumb[data-source="qiita"] {
+  background: oklch(0.97 0.04 145);
+  border-color: oklch(0.85 0.08 145);
+}
+.link-thumb[data-source="zenn"] {
+  background: oklch(0.97 0.03 245);
+  border-color: oklch(0.82 0.06 245);
+}
+.link-thumb[data-source="doc"],
+.link-thumb[data-source="book"],
+.link-thumb[data-source="globe"] {
+  background: var(--bg-2);
+  border-color: var(--line);
+}
+
+/* ダーク時はブランド色を抑え目に */
+body[data-theme="dark"] .link-thumb[data-source="youtube"] {
+  background: oklch(0.30 0.06 27);
+  border-color: oklch(0.42 0.08 27);
+}
+body[data-theme="dark"] .link-thumb[data-source="qiita"] {
+  background: oklch(0.30 0.06 145);
+  border-color: oklch(0.42 0.08 145);
+}
+body[data-theme="dark"] .link-thumb[data-source="zenn"] {
+  background: oklch(0.30 0.05 245);
+  border-color: oklch(0.42 0.07 245);
+}
+
+/* me-row-icon にもブランドアイコンを 18px で表示するため
+   アイコン用のスペーシング調整（数字短縮ラベル時の font-size 9px 設定の打ち消し） */
+.me-row-icon svg {
+  display: block;
+}
+
