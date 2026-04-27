@@ -33,6 +33,18 @@ docker compose exec app pnpm seed
 
 > ホスト公開ポートはデフォルトから **+200 シフト** しています（他Dockerプロジェクトとの衝突回避）。コンテナ内部のポートはデフォルトのままです。
 
+### テストアカウント
+
+`pnpm seed` で 3 名のテストユーザーが投入されます（パスワードは全員 `testtest`）：
+
+| メール | 名前 | ロール |
+|---|---|---|
+| `sato.k@example.ac.jp` | 佐藤 健一 | DX推進 |
+| `matsuoka.m@example.ac.jp` | 松岡 真理 | 情報支援 |
+| `kimura.r@example.ac.jp` | 木村 亮介 | DX推進 |
+
+各ユーザーの保有データ・動作確認シナリオは [docs/runbooks/test-accounts.md](docs/runbooks/test-accounts.md) を参照。
+
 詳細手順は [docs/runbooks/dev-setup.md](docs/runbooks/dev-setup.md)。
 
 ## ドキュメント
@@ -42,6 +54,7 @@ docker compose exec app pnpm seed
 | [docs/architecture.md](docs/architecture.md) | システム構成・データフロー |
 | [docs/data-model.md](docs/data-model.md) | Firestore コレクション・フィールド・Rules |
 | [docs/runbooks/dev-setup.md](docs/runbooks/dev-setup.md) | 開発環境セットアップ |
+| [docs/runbooks/test-accounts.md](docs/runbooks/test-accounts.md) | テストアカウント一覧と動作確認シナリオ |
 | [docs/security.md](docs/security.md) | Firestore/Storage Rules、CSP、認証ポリシー |
 | [docs/runbooks/deploy.md](docs/runbooks/deploy.md) | 本番Firebase（Blaze）移行手順 |
 | [docs/scope.md](docs/scope.md) | MVPスコープと将来計画 |

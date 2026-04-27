@@ -100,4 +100,5 @@ pnpm seed         # サンプルデータ投入（Emulator向け、env-guard 通
 - [docs/data-model.md](docs/data-model.md) — Firestore コレクション設計
 - [docs/decisions/](docs/decisions/) — ADR 一覧
 - [docs/runbooks/dev-setup.md](docs/runbooks/dev-setup.md) — 開発環境セットアップ
+- [docs/runbooks/test-accounts.md](docs/runbooks/test-accounts.md) — テストアカウント一覧（`pnpm seed` で投入）
 - [docs/runbooks/deploy.md](docs/runbooks/deploy.md) — 本番 Blaze 移行手順
