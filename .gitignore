@@ -46,3 +46,7 @@ coverage/
 # 一時ファイル
 *.tmp
 *.bak
+
+# Claude Code
+.claude/plans/
+.claude/local/

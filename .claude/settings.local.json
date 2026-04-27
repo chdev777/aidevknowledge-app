@@ -6,7 +6,16 @@
       "Read(//tmp/**)",
       "Bash(cp \"C:\\\\Users\\\\ipc_administrator\\\\.claude\\\\projects\\\\C--ai-claude-aidevknowledge\\\\179a3c2a-44eb-41f0-a875-210541745dcf\\\\tool-results\\\\webfetch-1777247790614-ifz8or.bin\" design.gz)",
       "Bash(gunzip -f design.gz)",
-      "Bash(tar -xf design)"
+      "Bash(tar -xf design)",
+      "Bash(git mv *)",
+      "Bash(mkdir -p docs/runbooks)",
+      "Bash(mkdir -p tools)",
+      "Bash(mkdir -p tools/prompts)",
+      "Bash(mkdir -p .claude/hooks)",
+      "Bash(mkdir -p .claude/skills)",
+      "Bash(mkdir -p tools/prompts .claude/hooks .claude/skills)",
+      "Bash(touch .claude/hooks/.gitkeep .claude/skills/.gitkeep tools/prompts/.gitkeep)",
+      "Bash(git add *)"
     ]
   }
 }

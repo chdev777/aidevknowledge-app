@@ -280,7 +280,7 @@ App Check は **Auth + Firestore + Storage の3つすべてに enforce**。debug
 
 - `acceptedAnswerId` を質問者以外が書き換えられる → Rules で対応
 - `tags[]` の正規化なし → `lib/utils/tag.ts` で trim/長さ制限
-- シードスクリプトで本番Firestore誤接続 → `scripts/env-guard.ts` で abort
+- シードスクリプトで本番Firestore誤接続 → `tools/scripts/env-guard.ts` で abort
 
 ### 総評
 

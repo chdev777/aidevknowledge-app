@@ -1,7 +1,7 @@
 /**
  * 本番Firestoreへの誤接続を検出する safety guard
  *
- * scripts/seed.ts の先頭で必ず実行する。
+ * tools/scripts/seed.ts の先頭で必ず実行する。
  * - FIRESTORE_EMULATOR_HOST が未設定 → 本番接続疑い → abort
  * - GCLOUD_PROJECT / FIREBASE_PROJECT_ID が "prod" / "production" を含む → abort
  */

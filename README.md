@@ -33,7 +33,7 @@ docker compose exec app pnpm seed
 
 > ホスト公開ポートはデフォルトから **+200 シフト** しています（他Dockerプロジェクトとの衝突回避）。コンテナ内部のポートはデフォルトのままです。
 
-詳細手順は [docs/local-dev.md](docs/local-dev.md)。
+詳細手順は [docs/runbooks/dev-setup.md](docs/runbooks/dev-setup.md)。
 
 ## ドキュメント
 
@@ -41,13 +41,13 @@ docker compose exec app pnpm seed
 |---|---|
 | [docs/architecture.md](docs/architecture.md) | システム構成・データフロー |
 | [docs/data-model.md](docs/data-model.md) | Firestore コレクション・フィールド・Rules |
-| [docs/local-dev.md](docs/local-dev.md) | 開発環境セットアップ |
+| [docs/runbooks/dev-setup.md](docs/runbooks/dev-setup.md) | 開発環境セットアップ |
 | [docs/security.md](docs/security.md) | Firestore/Storage Rules、CSP、認証ポリシー |
-| [docs/blaze-migration.md](docs/blaze-migration.md) | 本番Firebase（Blaze）移行手順 |
+| [docs/runbooks/deploy.md](docs/runbooks/deploy.md) | 本番Firebase（Blaze）移行手順 |
 | [docs/scope.md](docs/scope.md) | MVPスコープと将来計画 |
 | [docs/ui-design.md](docs/ui-design.md) | UIデザイン規約（oklch / hairline / フォント） |
 | [docs/review-findings.md](docs/review-findings.md) | 設計レビュー結果（architect / security / planner） |
-| [docs/adr/](docs/adr/) | 技術選定の根拠（ADR） |
+| [docs/decisions/](docs/decisions/) | 技術選定の根拠（ADR） |
 
 ## デザイン参照
 

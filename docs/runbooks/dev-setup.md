@@ -162,4 +162,4 @@ docker compose restart app
 
 - `.env` を **コミットしない**（`.gitignore` 設定済）
 - MinIO のアクセスキーは `.env.example` の値を必ず変更（`openssl rand -hex 16`）
-- 本番Firebase に誤接続しないよう、`scripts/env-guard.ts` が自動チェック
+- 本番Firebase に誤接続しないよう、`tools/scripts/env-guard.ts` が自動チェック

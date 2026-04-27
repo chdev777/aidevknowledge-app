@@ -11,8 +11,8 @@
     "test:rules": "vitest run --dir src/test/rules",
     "test:watch": "vitest",
     "lint": "tsc --noEmit",
-    "seed": "FIRESTORE_EMULATOR_HOST=firebase-emulator:8080 FIREBASE_AUTH_EMULATOR_HOST=firebase-emulator:9099 GCLOUD_PROJECT=aidev-knowledge-dev tsx scripts/seed.ts",
-    "env-guard": "tsx scripts/env-guard.ts"
+    "seed": "FIRESTORE_EMULATOR_HOST=firebase-emulator:8080 FIREBASE_AUTH_EMULATOR_HOST=firebase-emulator:9099 GCLOUD_PROJECT=aidev-knowledge-dev tsx tools/scripts/seed.ts",
+    "env-guard": "tsx tools/scripts/env-guard.ts"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.59.0",

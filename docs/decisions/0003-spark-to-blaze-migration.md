@@ -61,7 +61,7 @@ Spark には以下の制約があった：
 | Auth 強化 | Identity Platform / blocking trigger / メール検証必須 を Blaze で追加 |
 | App Check | 本番のみ初期化 |
 
-詳細は [../blaze-migration.md](../blaze-migration.md)。
+詳細は [../runbooks/deploy.md](../runbooks/deploy.md)。
 
 ## リスク
 

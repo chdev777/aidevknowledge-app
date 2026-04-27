@@ -127,7 +127,7 @@ VITE_STORAGE_PROVIDER=minio → firebase
 + App Check / Identity Platform / reCAPTCHA Enterprise の有効化
 ```
 
-詳細は [blaze-migration.md](./blaze-migration.md)。
+詳細は [runbooks/deploy.md](./runbooks/deploy.md)。
 
 ## 関連ドキュメント
 
@@ -135,6 +135,6 @@ VITE_STORAGE_PROVIDER=minio → firebase
 - [security.md](./security.md) — 防衛戦略・OWASP対応
 - [scope.md](./scope.md) — MVP/Phase 2/Phase 3 の線引き
 - [ui-design.md](./ui-design.md) — デザイントークン・命名規約
-- [blaze-migration.md](./blaze-migration.md) — 本番化手順
+- [runbooks/deploy.md](./runbooks/deploy.md) — 本番化手順
 - [review-findings.md](./review-findings.md) — 設計時の3エージェントレビュー
 - [adr/](./adr/) — 技術選定の根拠（ADR）

@@ -68,7 +68,7 @@ MVP は **`lib/` 60% 程度**を目標。理由：
 
 ## 受け入れ基準（MVP）
 
-[local-dev.md](./local-dev.md) の動作確認チェックリスト全項目通過。
+[runbooks/dev-setup.md](./runbooks/dev-setup.md) の動作確認チェックリスト全項目通過。
 特に：
 
 - 別ユーザーで他人の private 投稿を直接URL叩く → ForbiddenPage
