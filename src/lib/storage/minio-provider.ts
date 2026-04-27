@@ -1,7 +1,7 @@
 import { auth } from '../firebase/client.js';
 import type { StorageProvider, UploadCredentials, UploadOpts } from './provider.js';
 
-const proxyUrl = import.meta.env.VITE_OG_PROXY_URL ?? 'http://localhost:8787';
+const proxyUrl = import.meta.env.VITE_OG_PROXY_URL ?? 'http://localhost:8987';
 
 async function authedFetch(path: string, init: RequestInit = {}): Promise<Response> {
   const user = auth.currentUser;

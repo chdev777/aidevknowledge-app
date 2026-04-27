@@ -18,11 +18,12 @@ export const auth = getAuth(app);
 export const db = getFirestore(app);
 
 if (useEmulator) {
-  // ブラウザからは host name 解決のため localhost を使う（Docker host network）
-  const authHost = (import.meta.env.VITE_FIREBASE_AUTH_EMULATOR_HOST ?? 'localhost:9099')
+  // ブラウザは Docker network の外なので、ホスト側マッピング（+200 シフト済）を使う
+  // 万一 Docker network 名が指定されていても localhost に置換して安全側に倒す
+  const authHost = (import.meta.env.VITE_FIREBASE_AUTH_EMULATOR_HOST ?? 'localhost:9299')
     .replace(/^https?:\/\//, '')
     .replace('firebase-emulator', 'localhost');
-  const fsHost = (import.meta.env.VITE_FIRESTORE_EMULATOR_HOST ?? 'localhost:8080')
+  const fsHost = (import.meta.env.VITE_FIRESTORE_EMULATOR_HOST ?? 'localhost:8280')
     .replace(/^https?:\/\//, '')
     .replace('firebase-emulator', 'localhost');
 

@@ -9,11 +9,11 @@ AIアプリ開発ナレッジ共有Webアプリ。**ローカルDocker のフル
 | レイヤ | PoC（Docker） | 本番（Firebase Blaze） |
 |---|---|---|
 | フロントエンド | Vite + React 18 + TypeScript SPA | 同左（静的ビルド） |
-| ホスティング | Vite dev :3000 | Firebase Hosting + CSP/security headers |
-| 認証 | Firebase Auth Emulator :9099 | Firebase Auth + Identity Platform |
-| DB | Firestore Emulator :8080 | Firestore（強化Rules + indexes） |
-| ストレージ | MinIO :9000（S3互換） | Firebase Storage + Storage Rules + App Check |
-| OG/サムネ取得 | Express プロキシ :8787 | Cloud Functions (HTTPS callable) |
+| ホスティング | Vite dev :3200 | Firebase Hosting + CSP/security headers |
+| 認証 | Firebase Auth Emulator :9299 | Firebase Auth + Identity Platform |
+| DB | Firestore Emulator :8280 | Firestore（強化Rules + indexes） |
+| ストレージ | MinIO Console :9201（S3互換） | Firebase Storage + Storage Rules + App Check |
+| OG/サムネ取得 | Express プロキシ :8987 | Cloud Functions (HTTPS callable) |
 | 集計フィールド | クライアント `increment()`（PoCのみ） | Cloud Functions トリガー |
 | 監視 | なし | Cloud Logging / 予算超過自動停止Function |
 

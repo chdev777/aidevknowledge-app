@@ -1,6 +1,6 @@
 import { auth } from '../firebase/client.js';
 
-const proxyUrl = import.meta.env.VITE_OG_PROXY_URL ?? 'http://localhost:8787';
+const proxyUrl = import.meta.env.VITE_OG_PROXY_URL ?? 'http://localhost:8987';
 
 export interface OgMeta {
   title?: string;

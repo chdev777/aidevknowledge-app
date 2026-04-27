@@ -4,7 +4,8 @@
 
 - **Docker Desktop** インストール済み（WSL2 backend 推奨）
 - **pnpm** インストール済み（`npm install -g pnpm`）
-- ポートが空いていること：`3000, 4000, 8080, 8787, 9001, 9099`
+- ホスト公開ポートが空いていること：`3200, 4200, 8280, 8987, 9201, 9299`
+  （他のDockerプロジェクトとの衝突を避けるため、デフォルトから **+200 シフト** している）
 
 ## 初回セットアップ
 
@@ -21,21 +22,27 @@ docker compose exec app pnpm seed
 
 | URL | 用途 |
 |---|---|
-| http://localhost:3000 | アプリ本体（Vite dev） |
-| http://localhost:4000 | Firebase Emulator UI（Auth/Firestore操作） |
-| http://localhost:9001 | MinIO Console（バケット確認） |
-| http://localhost:8787/health | og-proxy ヘルスチェック |
+| http://localhost:3200 | アプリ本体（Vite dev） |
+| http://localhost:4200 | Firebase Emulator UI（Auth/Firestore操作） |
+| http://localhost:9201 | MinIO Console（バケット確認） |
+| http://localhost:8987/health | og-proxy ヘルスチェック |
 
 ## サービス構成
 
+ホスト公開ポート（左）とコンテナ内部ポート（右、不変）：
+
 ```
 docker-compose.yml
-├─ app                   ports 3000        Vite dev (pnpm dev --host)
-├─ firebase-emulator     ports 9099/8080/4000  Auth / Firestore / UI
-├─ minio                 ports 9001 (Consoleのみホスト公開)
-├─ minio-init            oneshot           bucket作成 + IAM policy
-└─ og-proxy              ports 8787        Express + 署名URL発行
+├─ app                   3200 → 3000        Vite dev (pnpm dev --host)
+├─ firebase-emulator     9299 → 9099        Auth
+│                        8280 → 8080        Firestore
+│                        4200 → 4000        Emulator UI
+├─ minio                 9201 → 9001        Console（9000 は internal network のみ）
+├─ minio-init            oneshot            bucket作成 + IAM policy
+└─ og-proxy              8987 → 8787        Express + 署名URL発行
 ```
+
+> ホスト公開ポートはデフォルトから **+200 シフト**。コンテナ内部のポートはデフォルトのままなので、Firebase SDK や og-proxy のコードは何も変更不要。
 
 `og-proxy` は MinIO アクセスキーを保持する唯一の場所。**SPA には絶対に渡さない**。
 
@@ -77,6 +84,25 @@ docker compose exec firebase-emulator \
 ```
 
 ## トラブルシュート
+
+### ポートが既に使われている（"port is already allocated"）
+
+別の Docker プロジェクトが同じホストポートを掴んでいる可能性。確認：
+
+```bash
+docker ps --format "table {{.Names}}\t{{.Ports}}"
+```
+
+または OS レベル：
+
+```bash
+# Windows PowerShell
+netstat -ano | findstr :3200
+```
+
+`docker-compose.yml` のホスト側ポート（左の数字）を空いているものに変更してから
+`docker compose up -d`。`.env` の `VITE_FIREBASE_AUTH_EMULATOR_HOST` /
+`VITE_FIRESTORE_EMULATOR_HOST` / `VITE_OG_PROXY_URL` も合わせて更新する。
 
 ### Vite HMR が効かない（Docker × Windows）
 

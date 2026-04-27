@@ -1,11 +1,15 @@
 # AIアプリ開発ナレッジ共有ハブ — PoC ローカルDocker環境
 #
-# サービス構成：
-#   app                Vite dev server :3000
-#   firebase-emulator  Auth :9099 / Firestore :8080 / UI :4000
-#   minio              S3互換ストレージ（Console :9001 のみホスト公開）
+# ホストへの公開ポートはデフォルトから +200 シフト（他プロジェクトとの衝突回避）
+#
+# サービス構成（左：ホスト公開 / 右：コンテナ内）：
+#   app                3200 → 3000   Vite dev server
+#   firebase-emulator  4200 → 4000   Emulator UI
+#                      8280 → 8080   Firestore
+#                      9299 → 9099   Auth
+#   minio              9201 → 9001   Console（9000 は internal network のみ）
 #   minio-init         oneshot bucket作成
-#   og-proxy           OG取得 + MinIO署名URL発行 :8787
+#   og-proxy           8987 → 8787   OG取得 + MinIO署名URL発行
 #
 # MinIO のシークレットは og-proxy / minio / minio-init のみが触る。
 # SPA (app) には絶対に渡さない（VITE_* で渡すとビルド成果物に埋め込まれるため）。
@@ -18,7 +22,7 @@ services:
     container_name: aidev-app
     working_dir: /app
     ports:
-      - "3000:3000"
+      - "3200:3000"
     volumes:
       - ./:/app
       - app_node_modules:/app/node_modules
@@ -39,9 +43,9 @@ services:
     container_name: aidev-firebase-emulator
     working_dir: /workspace
     ports:
-      - "9099:9099"   # Auth
-      - "8080:8080"   # Firestore
-      - "4000:4000"   # Emulator UI
+      - "9299:9099"   # Auth      (host 9299 → container 9099)
+      - "8280:8080"   # Firestore (host 8280 → container 8080)
+      - "4200:4000"   # Emulator UI (host 4200 → container 4000)
     volumes:
       - ./firebase.json:/workspace/firebase.json:ro
       - ./firestore.rules:/workspace/firestore.rules:ro
@@ -56,9 +60,9 @@ services:
     image: minio/minio:RELEASE.2024-09-13T20-26-02Z
     container_name: aidev-minio
     command: server /data --console-address ":9001"
-    # ホストへは Console (9001) のみ公開。9000 は Docker network 内部だけ
+    # ホストへは Console のみ公開。9000 は Docker network 内部だけ
     ports:
-      - "9001:9001"
+      - "9201:9001"  # Console (host 9201 → container 9001)
     expose:
       - "9000"
     environment:
@@ -97,7 +101,7 @@ services:
       dockerfile: Dockerfile
     container_name: aidev-og-proxy
     ports:
-      - "8787:8787"
+      - "8987:8787"  # host 8987 → container 8787
     environment:
       PORT: 8787
       MINIO_ENDPOINT: ${MINIO_ENDPOINT:-http://minio:9000}
