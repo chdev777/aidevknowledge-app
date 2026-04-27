@@ -1,0 +1,27 @@
+# 行末コードを自動正規化（Windowsでもクロスプラットフォーム維持）
+* text=auto eol=lf
+
+# シェルスクリプトは LF 固定
+*.sh text eol=lf
+
+# バッチファイルは CRLF 固定
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# バイナリ
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.gif binary
+*.tar.gz binary
+*.zip binary
+*.pdf binary
+
+# design-reference は実装の正だが編集禁止資産
+design-reference/** linguist-vendored
+
+# プロトタイプの jsx は言語統計から除外
+design-reference/**/*.jsx linguist-vendored
+design-reference/**/*.js linguist-vendored
+design-reference/**/*.css linguist-vendored

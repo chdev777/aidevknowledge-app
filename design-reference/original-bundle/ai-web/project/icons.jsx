@@ -1,0 +1,55 @@
+// Icons — 16px stroke-based. No emoji.
+const Icon = ({ name, size = 14, stroke = 1.5, style }) => {
+  const props = {
+    width: size, height: size, viewBox: "0 0 24 24",
+    fill: "none", stroke: "currentColor", strokeWidth: stroke,
+    strokeLinecap: "round", strokeLinejoin: "round", style,
+  };
+  const paths = {
+    home: <><path d="M3 11.5L12 4l9 7.5V20a1 1 0 0 1-1 1h-5v-7h-6v7H4a1 1 0 0 1-1-1v-8.5z"/></>,
+    link: <><path d="M10 13.5a4.5 4.5 0 0 0 6.36 0l3-3a4.5 4.5 0 0 0-6.36-6.36l-1.5 1.5"/><path d="M14 10.5a4.5 4.5 0 0 0-6.36 0l-3 3a4.5 4.5 0 0 0 6.36 6.36l1.5-1.5"/></>,
+    qa: <><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10z"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.5V14"/><circle cx="12" cy="17" r="0.4" fill="currentColor"/></>,
+    note: <><path d="M5 3h11l4 4v14H5z"/><path d="M16 3v4h4"/><path d="M8 12h8M8 16h5"/></>,
+    app: <><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></>,
+    project: <><path d="M3 7l3-3h5l2 2h8v13a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7z"/></>,
+    tag: <><path d="M20 12L12 20l-9-9V3h8z"/><circle cx="7.5" cy="7.5" r="1.2"/></>,
+    star: <><path d="M12 3.5l2.6 5.3 5.9.8-4.3 4.2 1 5.8L12 17l-5.2 2.7 1-5.8-4.3-4.2 5.9-.8z"/></>,
+    admin: <><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></>,
+    search: <><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></>,
+    plus: <><path d="M12 5v14M5 12h14"/></>,
+    arrow: <><path d="M5 12h14M13 6l6 6-6 6"/></>,
+    ext: <><path d="M14 5h5v5M19 5l-9 9M12 5H5v14h14v-7"/></>,
+    close: <><path d="M6 6l12 12M18 6L6 18"/></>,
+    clock: <><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></>,
+    check: <><path d="M5 12l4.5 4.5L19 7"/></>,
+    chevron: <><path d="M9 6l6 6-6 6"/></>,
+    chevronDown: <><path d="M6 9l6 6 6-6"/></>,
+    filter: <><path d="M3 5h18M6 12h12M10 19h4"/></>,
+    sort: <><path d="M7 4v16M3 8l4-4 4 4M17 20V4M13 16l4 4 4-4"/></>,
+    grid: <><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></>,
+    list: <><path d="M4 6h16M4 12h16M4 18h16"/></>,
+    bookmark: <><path d="M6 3h12v18l-6-4-6 4z"/></>,
+    eye: <><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="2.5"/></>,
+    message: <><path d="M21 12c0 4.4-4 8-9 8-1.5 0-3-.3-4.2-.8L3 21l1.3-4.5C3.5 15 3 13.5 3 12c0-4.4 4-8 9-8s9 3.6 9 8z"/></>,
+    heart: <><path d="M12 20s-7-4.3-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.7-7 10-7 10z"/></>,
+    youtube: <><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M10 10l4 2-4 2z" fill="currentColor"/></>,
+    github: <><path d="M9 19c-4 1.4-4-2-6-2.5M15 21v-3.5a3 3 0 0 0-.8-2.3c2.8-.3 5.8-1.4 5.8-6.2a4.8 4.8 0 0 0-1.3-3.3 4.5 4.5 0 0 0-.1-3.3s-1.1-.3-3.5 1.3a12 12 0 0 0-6.2 0C6.5 1.1 5.4 1.4 5.4 1.4a4.5 4.5 0 0 0-.1 3.3A4.8 4.8 0 0 0 4 8a4.6 4.6 0 0 0 5.8 6.2A3 3 0 0 0 9 16.5V21"/></>,
+    x: <><path d="M18 4L6 20M6 4l12 16"/></>,
+    book: <><path d="M4 4h6a4 4 0 0 1 4 4v13a3 3 0 0 0-3-3H4z"/><path d="M20 4h-6a4 4 0 0 0-4 4v13a3 3 0 0 1 3-3h7z"/></>,
+    doc: <><path d="M14 3H6v18h12V7z"/><path d="M14 3v4h4"/><path d="M9 12h6M9 16h6M9 8h2"/></>,
+    flag: <><path d="M5 20V4h10l-1 4 1 4H5"/></>,
+    thumb: <><path d="M7 11v9H4v-9zM7 11l4-7a2 2 0 0 1 2 2v4h5a2 2 0 0 1 2 2l-2 7a2 2 0 0 1-2 2H7"/></>,
+    send: <><path d="M3 12l18-9-5 18-4-8z"/><path d="M12 12L21 3"/></>,
+    activity: <><path d="M3 12h4l3-8 4 16 3-8h4"/></>,
+    edit: <><path d="M4 20h4l10-10-4-4L4 16z"/><path d="M14 6l4 4"/></>,
+    refresh: <><path d="M3 12a9 9 0 0 1 15.5-6.3L21 8M21 3v5h-5M21 12a9 9 0 0 1-15.5 6.3L3 16M3 21v-5h5"/></>,
+    user: <><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></>,
+    lock: <><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></>,
+    unlock: <><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 7.5-2"/></>,
+    globe: <><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></>,
+    draft: <><path d="M4 4h10l6 6v10H4z"/><path d="M14 4v6h6"/><path d="M8 14h5M8 17h8"/></>,
+  };
+  return <svg {...props}>{paths[name] || null}</svg>;
+};
+
+window.Icon = Icon;
