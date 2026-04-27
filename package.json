@@ -11,7 +11,7 @@
     "test:rules": "vitest run --dir src/test/rules",
     "test:watch": "vitest",
     "lint": "tsc --noEmit",
-    "seed": "tsx scripts/seed.ts",
+    "seed": "FIRESTORE_EMULATOR_HOST=firebase-emulator:8080 FIREBASE_AUTH_EMULATOR_HOST=firebase-emulator:9099 GCLOUD_PROJECT=aidev-knowledge-dev tsx scripts/seed.ts",
     "env-guard": "tsx scripts/env-guard.ts"
   },
   "dependencies": {
@@ -27,9 +27,11 @@
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^3.0.4",
+    "@types/node": "^22.7.5",
     "@types/react": "^18.3.11",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.2",
+    "firebase-admin": "^12.6.0",
     "tsx": "^4.19.1",
     "typescript": "^5.6.2",
     "vite": "^5.4.8",
