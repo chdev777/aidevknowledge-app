@@ -1,14 +1,15 @@
-import { Link, useParams } from 'react-router-dom';
+import { Link as RouterLink, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { linksDb } from '../../lib/db/index.js';
-import { ImportanceBadge, SourceTypeBadge, StatusBadge } from '../../components/shared/StatusBadge.js';
-import { TagList } from '../../components/shared/Tag.js';
-import { VisibilityBadge } from '../../components/shared/VisibilityBadge.js';
+import { useUser } from '../../lib/firebase/use-user.js';
+import { Avatar } from '../../components/shell/Avatar.js';
 import { CommentList } from '../../components/comments/CommentList.js';
 import { CommentComposer } from '../../components/comments/CommentComposer.js';
 import { Spinner } from '../../components/shared/Spinner.js';
+import { Icon } from '../../components/shared/Icon.js';
 import { ForbiddenPage } from '../ForbiddenPage.js';
 import { isSafeHref } from '../../lib/utils/url.js';
+import { timeAgo } from '../../lib/utils/time.js';
 
 export function LinkDetailPage() {
   const { id = '' } = useParams();
@@ -21,70 +22,156 @@ export function LinkDetailPage() {
   if (q.isPending) {
     return (
       <div className="page">
-        <div className="section-loading"><Spinner /></div>
+        <Spinner />
       </div>
     );
   }
-
-  if (q.error || !q.data) {
-    return <ForbiddenPage />;
-  }
+  if (q.error || !q.data) return <ForbiddenPage />;
 
   const l = q.data;
 
   return (
     <div className="page">
-      <header className="page-head">
-        <div className="row-meta">
-          <SourceTypeBadge value={l.sourceType} />
-          <span className="mono">{l.domain}</span>
-          <ImportanceBadge value={l.importance} />
-          <StatusBadge value={l.status} />
-          <VisibilityBadge value={l.visibility} />
+      <RouterLink to="/links" className="btn ghost sm" style={{ marginBottom: 16 }}>
+        ← URL共有に戻る
+      </RouterLink>
+
+      <div className="detail-layout">
+        <div>
+          <div className="detail-eyebrow">{l.sourceType} · {l.domain}</div>
+          <h1 className="detail-title">{l.title}</h1>
+          <DetailMeta uid={l.createdBy} createdAt={l.createdAt}>
+            <span className="badge" data-status={l.status}>
+              <span className="badge-dot" />
+              {l.status}
+            </span>
+            <span className="importance" data-level={l.importance}>
+              <span className="importance-bars">
+                <span className="importance-bar" />
+                <span className="importance-bar" />
+                <span className="importance-bar" />
+              </span>
+              {l.importance}
+            </span>
+          </DetailMeta>
+
+          {isSafeHref(l.url) && (
+            <a
+              href={l.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn"
+              style={{ marginBottom: 22 }}
+            >
+              <Icon name="link" size={13} />
+              {l.url}
+            </a>
+          )}
+
+          {l.summary && (
+            <div style={{ marginBottom: 26 }}>
+              <div className="section-title">概要</div>
+              <div className="prose">{l.summary}</div>
+            </div>
+          )}
+
+          {l.userComment && (
+            <div style={{ marginBottom: 26 }}>
+              <div className="section-title">共有コメント</div>
+              <div className="card" style={{ padding: 18 }}>
+                <div className="prose" style={{ margin: 0 }}>{l.userComment}</div>
+              </div>
+            </div>
+          )}
+
+          <div style={{ marginBottom: 26 }}>
+            <div className="section-title">タグ</div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {l.tags.map((t) => (
+                <span key={t} className="tag"><span className="tag-dot" />{t}</span>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ marginBottom: 26 }}>
+            <div className="section-title">コメント</div>
+            <CommentComposer
+              targetType="link"
+              targetId={l.id}
+              targetVisibility={l.visibility}
+            />
+            <CommentList targetType="link" targetId={l.id} />
+          </div>
         </div>
-        <h1 className="page-title">{l.title}</h1>
-        {isSafeHref(l.url) && (
-          <a className="page-link mono" href={l.url} target="_blank" rel="noopener noreferrer">
-            {l.url} →
-          </a>
-        )}
-      </header>
 
-      {l.thumbnailUrl && (
-        <div className="link-thumb">
-          <img src={l.thumbnailUrl} alt="" loading="lazy" />
-        </div>
-      )}
-
-      <section className="page-section">
-        <h2 className="section-title">共有コメント</h2>
-        <p className="prose">{l.userComment}</p>
-      </section>
-
-      {l.summary && (
-        <section className="page-section">
-          <h2 className="section-title">概要</h2>
-          <p className="prose">{l.summary}</p>
-        </section>
-      )}
-
-      <section className="page-section">
-        <TagList names={l.tags} />
-      </section>
-
-      <section className="page-section">
-        <h2 className="section-title">コメント</h2>
-        <CommentComposer
-          targetType="link"
-          targetId={l.id}
-          targetVisibility={l.visibility}
-        />
-        <CommentList targetType="link" targetId={l.id} />
-      </section>
-
-      <div className="page-foot">
-        <Link to="/links" className="btn">← 一覧に戻る</Link>
+        <aside className="detail-aside">
+          <DetailAsideAuthor uid={l.createdBy} />
+          <AsideRow label="ステータス">
+            <span className="badge" data-status={l.status}>
+              <span className="badge-dot" />
+              {l.status}
+            </span>
+          </AsideRow>
+          <AsideRow label="重要度">
+            <span className="importance" data-level={l.importance}>
+              <span className="importance-bars">
+                <span className="importance-bar" />
+                <span className="importance-bar" />
+                <span className="importance-bar" />
+              </span>
+              {l.importance}
+            </span>
+          </AsideRow>
+          <AsideRow label="作成日時">
+            <span className="mono" style={{ fontSize: 12 }}>
+              {l.createdAt.toLocaleString('ja-JP')}
+            </span>
+          </AsideRow>
+        </aside>
       </div>
+    </div>
+  );
+}
+
+function DetailMeta({
+  uid,
+  createdAt,
+  children,
+}: {
+  uid: string;
+  createdAt: Date;
+  children?: React.ReactNode;
+}) {
+  const author = useUser(uid);
+  return (
+    <div className="detail-meta">
+      {author.data && <Avatar user={author.data} size="sm" />}
+      {author.data && <span>{author.data.name}</span>}
+      <span className="dot-sep">·</span>
+      <span>{timeAgo(createdAt)}</span>
+      {children && <span className="dot-sep">·</span>}
+      {children}
+    </div>
+  );
+}
+
+function DetailAsideAuthor({ uid }: { uid: string }) {
+  const author = useUser(uid);
+  return (
+    <AsideRow label="共有者">
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+        {author.data && <Avatar user={author.data} size="sm" />}
+        {author.data?.name ?? '—'}
+      </span>
+    </AsideRow>
+  );
+}
+
+function AsideRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="aside-section">
+      <div className="aside-label">{label}</div>
+      <div className="aside-value">{children}</div>
     </div>
   );
 }

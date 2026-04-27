@@ -1,89 +1,89 @@
 import { useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { appsDb } from '../../lib/db/index.js';
 import { searchByFields } from '../../lib/utils/search.js';
 import { APP_STATUS_VALUES, type AppStatus } from '../../types/app.js';
-import { StatusBadge } from '../../components/shared/StatusBadge.js';
-import { TagList } from '../../components/shared/Tag.js';
+import { PageHeader } from '../../components/shared/PageHeader.js';
+import { FilterBar } from '../../components/shared/FilterBar.js';
+import { AppRow } from '../../components/rows/AppRow.js';
 import { EmptyState } from '../../components/shared/EmptyState.js';
 import { Spinner } from '../../components/shared/Spinner.js';
+import { Icon } from '../../components/shared/Icon.js';
+
+type Filter = 'all' | AppStatus;
 
 export function AppsPage() {
   const [, setParams] = useSearchParams();
   const [search, setSearch] = useState('');
-  const [status, setStatus] = useState<'all' | AppStatus>('all');
+  const [status, setStatus] = useState<Filter>('all');
 
   const q = useQuery({
     queryKey: ['apps', 'shared'],
     queryFn: () => appsDb.findShared({ count: 200 }),
   });
+  const all = q.data ?? [];
+
+  const filters = useMemo(
+    () => [
+      { key: 'all' as const, label: 'すべて', count: all.length },
+      ...APP_STATUS_VALUES.map((s) => ({
+        key: s,
+        label: s,
+        count: all.filter((x) => x.status === s).length,
+      })),
+    ],
+    [all],
+  );
 
   const filtered = useMemo(() => {
-    if (!q.data) return [];
     return searchByFields(
-      q.data.filter((a) => (status === 'all' ? true : a.status === status)),
+      all.filter((a) => (status === 'all' ? true : a.status === status)),
       search,
       ['name', 'summary', 'purpose'],
     );
-  }, [q.data, search, status]);
+  }, [all, search, status]);
 
   return (
     <div className="page">
-      <header className="page-head">
-        <div className="page-head-row">
-          <div>
-            <h1 className="page-title">作成アプリ</h1>
-            <p className="page-subtitle">担当者が作成したAIアプリの共有とレビュー</p>
-          </div>
+      <PageHeader
+        eyebrow="04 · APPS"
+        title="作成アプリ"
+        subtitle="担当者が作成したAIアプリと、関係者からのコメント・レビューを集約する。"
+        actions={
           <button
             type="button"
-            className="btn btn-primary"
+            className="btn primary sm"
             onClick={() => setParams({ compose: 'app' })}
           >
-            ＋ アプリを登録
+            <Icon name="plus" size={13} />
+            アプリを登録
           </button>
-        </div>
-      </header>
+        }
+      />
 
-      <div className="list-toolbar">
+      <FilterBar filters={filters} value={status} onChange={setStatus} groupLabel="ステータス" />
+
+      <div style={{ padding: '14px 0 0' }}>
         <input
           type="search"
           placeholder="アプリ名・概要・目的で検索"
-          className="list-search"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
+          className="list-search"
         />
-        <select
-          className="list-filter"
-          value={status}
-          onChange={(e) => setStatus(e.target.value as 'all' | AppStatus)}
-        >
-          <option value="all">すべてのステータス</option>
-          {APP_STATUS_VALUES.map((s) => (
-            <option key={s} value={s}>{s}</option>
-          ))}
-        </select>
       </div>
 
-      {q.isPending && <div className="section-loading"><Spinner /></div>}
+      {q.isPending && <Spinner />}
       {q.data && filtered.length === 0 && <EmptyState title="該当するアプリはありません" />}
 
-      <ul className="row-list">
-        {filtered.map((a) => (
-          <li key={a.id} className="row-item">
-            <Link to={`/apps/${a.id}`} className="row-link">
-              <div className="row-meta">
-                <StatusBadge value={a.status} />
-                <span className="mono row-domain">{a.usageScope}</span>
-              </div>
-              <div className="row-title">{a.name}</div>
-              <div className="row-comment">{a.summary}</div>
-              <TagList names={a.tags} />
-            </Link>
-          </li>
-        ))}
-      </ul>
+      {filtered.length > 0 && (
+        <div style={{ borderTop: '1px solid var(--line)', marginTop: 14 }}>
+          {filtered.map((a) => (
+            <AppRow key={a.id} app={a} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

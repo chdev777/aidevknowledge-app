@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
   appsDb,
@@ -9,20 +9,29 @@ import {
   questionsDb,
 } from '../lib/db/index.js';
 import { useAuth } from '../lib/firebase/auth-context.js';
-import { Avatar } from '../components/shell/Avatar.js';
-import { TabBar, type TabDef } from '../components/me/TabBar.js';
-import { MetricsRow } from '../components/me/MetricsRow.js';
 import { VisibilityToggle } from '../components/me/VisibilityToggle.js';
-import { VisibilityBadge } from '../components/shared/VisibilityBadge.js';
-import { TagList } from '../components/shared/Tag.js';
-import { StatusBadge } from '../components/shared/StatusBadge.js';
 import { Spinner } from '../components/shared/Spinner.js';
 import { EmptyState } from '../components/shared/EmptyState.js';
+import { Icon, type IconName } from '../components/shared/Icon.js';
 import { CommentTypeBadge } from '../components/comments/CommentTypeBadge.js';
+import { sourceShort } from '../lib/utils/source.js';
+import { timeAgo } from '../lib/utils/time.js';
 import type { Visibility } from '../types/visibility.js';
+import type { Link as LinkDoc } from '../types/link.js';
+import type { Question } from '../types/question.js';
+import type { Note } from '../types/note.js';
+import type { AiApp } from '../types/app.js';
 
 type VisFilter = 'all' | 'shared' | 'private';
-type TabId = 'links' | 'questions' | 'notes' | 'apps' | 'comments';
+type TabId = 'links' | 'questions' | 'notes' | 'apps' | 'comments' | 'favorites' | 'drafts';
+
+interface TabDef {
+  id: TabId;
+  label: string;
+  icon: IconName;
+  count?: number;
+  disabled?: boolean;
+}
 
 export function MyPage() {
   const { profile, fbUser } = useAuth();
@@ -73,76 +82,136 @@ export function MyPage() {
     };
   }, [linksQ.data, questionsQ.data, notesQ.data, appsQ.data, commentsQ.data]);
 
+  const unanswered = (questionsQ.data ?? []).filter((q) => q.answerCount === 0).length;
+  const answered = (counts.questions.total ?? 0) - unanswered;
+
   const tabs: TabDef[] = [
-    { id: 'links', label: '自分のURL', count: counts.links.total },
-    { id: 'questions', label: '自分の質問', count: counts.questions.total },
-    { id: 'notes', label: '自分の検証メモ', count: counts.notes.total },
-    { id: 'apps', label: '自分の作成アプリ', count: counts.apps.total },
-    { id: 'comments', label: 'コメント履歴', count: counts.comments.total },
-    { id: 'favorites', label: 'お気に入り', disabled: true },
-    { id: 'drafts', label: '下書き', disabled: true },
+    { id: 'links', label: '自分のURL', icon: 'link', count: counts.links.total },
+    { id: 'questions', label: '自分の質問', icon: 'qa', count: counts.questions.total },
+    { id: 'notes', label: '自分の検証メモ', icon: 'note', count: counts.notes.total },
+    { id: 'apps', label: '自分の作成アプリ', icon: 'app', count: counts.apps.total },
+    { id: 'comments', label: 'コメント履歴', icon: 'message', count: counts.comments.total },
+    { id: 'favorites', label: 'お気に入り', icon: 'star', disabled: true },
+    { id: 'drafts', label: '下書き', icon: 'note', disabled: true },
   ];
 
   const visMatch = (v: Visibility) =>
     visFilter === 'all' ? true : visFilter === v;
 
-  const compose = (kind: 'link' | 'question' | 'note' | 'app') => {
+  const compose = (kind: 'link' | 'note' | 'app') => {
     const next = new URLSearchParams(params);
     next.set('compose', kind);
     setParams(next);
   };
 
-  if (!uid) return null;
+  if (!uid || !profile) return null;
+
+  const initials = profile.name
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((s) => s.charAt(0))
+    .join('')
+    .slice(0, 2);
 
   return (
     <div className="page">
-      <header className="me-header">
-        {profile && <Avatar user={profile} size="lg" />}
-        <div className="me-header-meta">
-          <h1 className="me-name">{profile?.name}</h1>
-          <div className="mono me-handle">
-            @{profile?.handle} · {profile?.role}
+      <div className="me-header">
+        <div
+          className="me-avatar"
+          style={{
+            background: `${profile.color}22`,
+            color: profile.color,
+            borderColor: `${profile.color}44`,
+          }}
+        >
+          {initials}
+        </div>
+        <div>
+          <div
+            style={{
+              fontFamily: 'var(--font-mono)',
+              fontSize: 10,
+              color: 'var(--ink-3)',
+              letterSpacing: '0.12em',
+              textTransform: 'uppercase',
+            }}
+          >
+            MY PAGE
           </div>
+          <div className="me-name">
+            {profile.name}{' '}
+            <span style={{ color: 'var(--ink-3)', fontSize: 14, fontWeight: 400 }}>さん</span>
+          </div>
+          <div className="me-role">{profile.role} · @{profile.handle}</div>
+          {fbUser?.email && <div className="me-email">{fbUser.email}</div>}
         </div>
-        <div className="me-quick-actions">
-          <button type="button" className="btn" onClick={() => compose('link')}>
-            ＋ URL
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <button type="button" className="btn sm" onClick={() => compose('link')}>
+            <Icon name="plus" size={12} />
+            URLを登録
           </button>
-          <button type="button" className="btn" onClick={() => compose('question')}>
-            ＋ 質問
+          <button type="button" className="btn sm" onClick={() => compose('note')}>
+            <Icon name="plus" size={12} />
+            検証メモを書く
           </button>
-          <button type="button" className="btn" onClick={() => compose('note')}>
-            ＋ メモ
-          </button>
-          <button type="button" className="btn" onClick={() => compose('app')}>
-            ＋ アプリ
+          <button type="button" className="btn sm" onClick={() => compose('app')}>
+            <Icon name="plus" size={12} />
+            作成アプリを登録
           </button>
         </div>
-      </header>
+      </div>
 
-      <MetricsRow
-        items={[
-          { label: 'URL', total: counts.links.total, shared: counts.links.shared, privateCount: counts.links.privateCount },
-          { label: '質問', total: counts.questions.total, shared: counts.questions.shared, privateCount: counts.questions.privateCount },
-          { label: '検証メモ', total: counts.notes.total, shared: counts.notes.shared, privateCount: counts.notes.privateCount },
-          { label: '作成アプリ', total: counts.apps.total, shared: counts.apps.shared, privateCount: counts.apps.privateCount },
-          { label: 'コメント', total: counts.comments.total },
-        ]}
-      />
+      <div className="section-title">自分の登録状況</div>
+      <div className="me-stats">
+        <Stat label="登録URL" value={counts.links.total} unit="件" splits={[`共有 ${counts.links.shared}`, `非公開 ${counts.links.privateCount}`]} />
+        <Stat label="質問" value={counts.questions.total} unit="件" splits={[`未回答 ${unanswered}`, `回答済 ${answered}`]} />
+        <Stat label="検証メモ" value={counts.notes.total} unit="件" splits={[`共有 ${counts.notes.shared}`, `非公開 ${counts.notes.privateCount}`]} />
+        <Stat label="作成アプリ" value={counts.apps.total} unit="件" splits={[`共有 ${counts.apps.shared}`, `非公開 ${counts.apps.privateCount}`]} />
+        <Stat label="コメント" value={counts.comments.total} unit="件" />
+      </div>
 
-      <TabBar tabs={tabs} active={tab} onChange={(id) => setTab(id as TabId)} />
+      <div className="me-tabs">
+        {tabs.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            className={`me-tab ${t.id === tab ? 'active' : ''}`}
+            onClick={() => !t.disabled && setTab(t.id)}
+            disabled={t.disabled}
+            style={t.disabled ? { opacity: 0.4, cursor: 'not-allowed' } : undefined}
+          >
+            <Icon name={t.icon} size={13} />
+            {t.label}
+            {t.count !== undefined && <span className="me-tab-count">{t.count}</span>}
+          </button>
+        ))}
+      </div>
 
-      {tab !== 'comments' && (
-        <div className="me-vis-filter">
-          <SegmentedControl
-            value={visFilter}
-            onChange={setVisFilter}
-            options={[
-              { id: 'all', label: 'すべて' },
-              { id: 'shared', label: '共有中' },
-              { id: 'private', label: '非公開' },
-            ]}
-          />
+      {(tab === 'links' || tab === 'questions' || tab === 'notes' || tab === 'apps') && (
+        <div className="me-filter">
+          <div className="vis-switch">
+            <button
+              type="button"
+              className={visFilter === 'all' ? 'active' : ''}
+              onClick={() => setVisFilter('all')}
+            >
+              すべて
+            </button>
+            <button
+              type="button"
+              className={visFilter === 'shared' ? 'active' : ''}
+              onClick={() => setVisFilter('shared')}
+            >
+              共有中
+            </button>
+            <button
+              type="button"
+              className={visFilter === 'private' ? 'active' : ''}
+              onClick={() => setVisFilter('private')}
+            >
+              非公開
+            </button>
+          </div>
         </div>
       )}
 
@@ -150,29 +219,13 @@ export function MyPage() {
         <OwnedList
           q={linksQ}
           filter={(item) => visMatch(item.visibility)}
-          rowKey="id"
           renderRow={(l) => (
-            <Link to={`/links/${l.id}`} className="row-link">
-              <div className="row-meta">
-                <VisibilityBadge value={l.visibility} />
-                <StatusBadge value={l.status} />
-                <span className="mono row-domain">{l.sourceType} · {l.domain}</span>
-              </div>
-              <div className="row-title">{l.title}</div>
-              <TagList names={l.tags} />
-            </Link>
-          )}
-          renderActions={(l) => (
-            <VisibilityToggle
-              current={l.visibility}
-              invalidateKeys={[
-                ['me', 'links', uid],
-                ['links', 'shared'],
-                ['home', 'recentLinks'],
-              ]}
-              setVisibility={(v) => linksDb.updateVisibility(l.id, v)}
+            <LinkMeRow
+              link={l}
+              uid={uid}
             />
           )}
+          rowKey="id"
         />
       )}
 
@@ -180,29 +233,8 @@ export function MyPage() {
         <OwnedList
           q={questionsQ}
           filter={(item) => visMatch(item.visibility)}
+          renderRow={(q) => <QuestionMeRow q={q} uid={uid} />}
           rowKey="id"
-          renderRow={(qq) => (
-            <Link to={`/qa/${qq.id}`} className="row-link">
-              <div className="row-meta">
-                <VisibilityBadge value={qq.visibility} />
-                <StatusBadge value={qq.status} />
-                <span className="mono">回答 {qq.answerCount}</span>
-              </div>
-              <div className="row-title">{qq.title}</div>
-              <TagList names={qq.tags} />
-            </Link>
-          )}
-          renderActions={(qq) => (
-            <VisibilityToggle
-              current={qq.visibility}
-              invalidateKeys={[
-                ['me', 'questions', uid],
-                ['questions', 'shared'],
-                ['home', 'unansweredQuestions'],
-              ]}
-              setVisibility={(v) => questionsDb.updateVisibility(qq.id, v)}
-            />
-          )}
         />
       )}
 
@@ -210,28 +242,8 @@ export function MyPage() {
         <OwnedList
           q={notesQ}
           filter={(item) => visMatch(item.visibility)}
+          renderRow={(n) => <NoteMeRow note={n} uid={uid} />}
           rowKey="id"
-          renderRow={(n) => (
-            <Link to={`/notes/${n.id}`} className="row-link">
-              <div className="row-meta">
-                <VisibilityBadge value={n.visibility} />
-              </div>
-              <div className="row-title">{n.title}</div>
-              <div className="row-comment">{n.purpose || n.result}</div>
-              <TagList names={n.tags} />
-            </Link>
-          )}
-          renderActions={(n) => (
-            <VisibilityToggle
-              current={n.visibility}
-              invalidateKeys={[
-                ['me', 'notes', uid],
-                ['notes', 'shared'],
-                ['home', 'recentNotes'],
-              ]}
-              setVisibility={(v) => notesDb.updateVisibility(n.id, v)}
-            />
-          )}
         />
       )}
 
@@ -239,38 +251,46 @@ export function MyPage() {
         <OwnedList
           q={appsQ}
           filter={(item) => visMatch(item.visibility)}
+          renderRow={(a) => <AppMeRow app={a} uid={uid} />}
           rowKey="id"
-          renderRow={(a) => (
-            <Link to={`/apps/${a.id}`} className="row-link">
-              <div className="row-meta">
-                <VisibilityBadge value={a.visibility} />
-                <StatusBadge value={a.status} />
-                <span className="mono">{a.usageScope}</span>
-              </div>
-              <div className="row-title">{a.name}</div>
-              <div className="row-comment">{a.summary}</div>
-              <TagList names={a.tags} />
-            </Link>
-          )}
-          renderActions={(a) => (
-            <VisibilityToggle
-              current={a.visibility}
-              invalidateKeys={[
-                ['me', 'apps', uid],
-                ['apps', 'shared'],
-                ['home', 'recentApps'],
-              ]}
-              setVisibility={(v) => appsDb.updateVisibility(a.id, v)}
-            />
-          )}
         />
       )}
 
-      {tab === 'comments' && (
-        <CommentHistory
-          isPending={commentsQ.isPending}
-          items={commentsQ.data ?? []}
-        />
+      {tab === 'comments' && <CommentHistory items={commentsQ.data ?? []} isPending={commentsQ.isPending} />}
+
+      {(tab === 'favorites' || tab === 'drafts') && (
+        <EmptyState title="今後実装予定" description="Phase 2 で公開予定の機能です。" />
+      )}
+    </div>
+  );
+}
+
+function Stat({
+  label,
+  value,
+  unit,
+  splits,
+}: {
+  label: string;
+  value: number;
+  unit?: string;
+  splits?: string[];
+}) {
+  return (
+    <div className="me-stat">
+      <div className="me-stat-label">{label}</div>
+      <div className="me-stat-value">
+        {value}
+        {unit && <span style={{ fontSize: 13, color: 'var(--ink-3)', fontWeight: 500 }}>{unit}</span>}
+      </div>
+      {splits && splits.length > 0 && (
+        <div className="me-stat-split">
+          {splits.map((s, i) => (
+            <span key={i} className={i === 0 && splits[0]!.startsWith('共有') ? 'sp-shared' : 'sp-private'}>
+              {s}
+            </span>
+          ))}
+        </div>
       )}
     </div>
   );
@@ -281,33 +301,158 @@ function OwnedList<T extends { id: string }>(props: {
   filter: (item: T) => boolean;
   rowKey: keyof T;
   renderRow: (item: T) => JSX.Element;
-  renderActions: (item: T) => JSX.Element;
 }) {
-  if (props.q.isPending) return <div className="section-loading"><Spinner /></div>;
+  if (props.q.isPending) return <Spinner />;
   const items = (props.q.data ?? []).filter(props.filter);
   if (items.length === 0) {
     return <EmptyState title="該当する登録はありません" />;
   }
   return (
-    <ul className="row-list">
+    <div style={{ borderTop: '1px solid var(--line)' }}>
       {items.map((item) => (
-        <li key={String(item[props.rowKey])} className="row-item me-row">
-          <div className="me-row-main">{props.renderRow(item)}</div>
-          <div className="me-row-actions">{props.renderActions(item)}</div>
-        </li>
+        <div key={String(item[props.rowKey])}>{props.renderRow(item)}</div>
       ))}
-    </ul>
+    </div>
+  );
+}
+
+function VisBadge({ v }: { v: Visibility }) {
+  return (
+    <span className="vis-badge" data-vis={v}>
+      {v === 'shared' ? '共有中' : '非公開'}
+    </span>
+  );
+}
+
+function LinkMeRow({ link, uid }: { link: LinkDoc; uid: string }) {
+  const nav = useNavigate();
+  return (
+    <div className="me-row">
+      <div className="me-row-icon">{sourceShort(link.sourceType)}</div>
+      <div style={{ minWidth: 0 }}>
+        <div className="me-row-title" onClick={() => nav(`/links/${link.id}`)}>{link.title}</div>
+        <div className="me-row-meta">
+          <VisBadge v={link.visibility} />
+          {link.tags.slice(0, 3).map((t) => (
+            <span key={t} className="tag"><span className="tag-dot" />{t}</span>
+          ))}
+          <span>· {timeAgo(link.createdAt)}</span>
+        </div>
+      </div>
+      <div className="me-actions">
+        <Link to={`/links/${link.id}`} className="btn xs">詳細</Link>
+        <VisibilityToggle
+          current={link.visibility}
+          invalidateKeys={[
+            ['me', 'links', uid],
+            ['links', 'shared'],
+            ['home', 'recentLinks'],
+          ]}
+          setVisibility={(v) => linksDb.updateVisibility(link.id, v)}
+        />
+      </div>
+    </div>
+  );
+}
+
+function QuestionMeRow({ q, uid }: { q: Question; uid: string }) {
+  const nav = useNavigate();
+  return (
+    <div className="me-row">
+      <div className="me-row-icon">Q&A</div>
+      <div style={{ minWidth: 0 }}>
+        <div className="me-row-title" onClick={() => nav(`/qa/${q.id}`)}>{q.title}</div>
+        <div className="me-row-meta">
+          <VisBadge v={q.visibility} />
+          <span className="badge" data-status={q.status}><span className="badge-dot" />{q.status}</span>
+          <span>· 回答 {q.answerCount}</span>
+          <span>· {timeAgo(q.createdAt)}</span>
+        </div>
+      </div>
+      <div className="me-actions">
+        <Link to={`/qa/${q.id}`} className="btn xs">詳細</Link>
+        <VisibilityToggle
+          current={q.visibility}
+          invalidateKeys={[
+            ['me', 'questions', uid],
+            ['questions', 'shared'],
+            ['home', 'unansweredQuestions'],
+          ]}
+          setVisibility={(v) => questionsDb.updateVisibility(q.id, v)}
+        />
+      </div>
+    </div>
+  );
+}
+
+function NoteMeRow({ note, uid }: { note: Note; uid: string }) {
+  const nav = useNavigate();
+  return (
+    <div className="me-row">
+      <div className="me-row-icon">NOTE</div>
+      <div style={{ minWidth: 0 }}>
+        <div className="me-row-title" onClick={() => nav(`/notes/${note.id}`)}>{note.title}</div>
+        <div className="me-row-meta">
+          <VisBadge v={note.visibility} />
+          {note.tags.slice(0, 3).map((t) => (
+            <span key={t} className="tag"><span className="tag-dot" />{t}</span>
+          ))}
+          <span>· {timeAgo(note.createdAt)}</span>
+        </div>
+      </div>
+      <div className="me-actions">
+        <Link to={`/notes/${note.id}`} className="btn xs">詳細</Link>
+        <VisibilityToggle
+          current={note.visibility}
+          invalidateKeys={[
+            ['me', 'notes', uid],
+            ['notes', 'shared'],
+            ['home', 'recentNotes'],
+          ]}
+          setVisibility={(v) => notesDb.updateVisibility(note.id, v)}
+        />
+      </div>
+    </div>
+  );
+}
+
+function AppMeRow({ app, uid }: { app: AiApp; uid: string }) {
+  const nav = useNavigate();
+  return (
+    <div className="me-row">
+      <div className="me-row-icon">APP</div>
+      <div style={{ minWidth: 0 }}>
+        <div className="me-row-title" onClick={() => nav(`/apps/${app.id}`)}>{app.name}</div>
+        <div className="me-row-meta">
+          <VisBadge v={app.visibility} />
+          <span className="badge" data-status={app.status}><span className="badge-dot" />{app.status}</span>
+          <span>· {timeAgo(app.createdAt)}</span>
+        </div>
+      </div>
+      <div className="me-actions">
+        <Link to={`/apps/${app.id}`} className="btn xs">詳細</Link>
+        <VisibilityToggle
+          current={app.visibility}
+          invalidateKeys={[
+            ['me', 'apps', uid],
+            ['apps', 'shared'],
+            ['home', 'recentApps'],
+          ]}
+          setVisibility={(v) => appsDb.updateVisibility(app.id, v)}
+        />
+      </div>
+    </div>
   );
 }
 
 function CommentHistory({
-  isPending,
   items,
+  isPending,
 }: {
-  isPending: boolean;
   items: import('../types/comment.js').Comment[];
+  isPending: boolean;
 }) {
-  if (isPending) return <div className="section-loading"><Spinner /></div>;
+  if (isPending) return <Spinner />;
   if (items.length === 0) return <EmptyState title="まだコメントはありません" />;
   return (
     <ul className="comment-list">
@@ -327,26 +472,5 @@ function CommentHistory({
         </li>
       ))}
     </ul>
-  );
-}
-
-function SegmentedControl<T extends string>(props: {
-  value: T;
-  onChange: (v: T) => void;
-  options: { id: T; label: string }[];
-}) {
-  return (
-    <div className="segmented">
-      {props.options.map((o) => (
-        <button
-          key={o.id}
-          type="button"
-          className={`segmented-item ${props.value === o.id ? 'is-active' : ''}`}
-          onClick={() => props.onChange(o.id)}
-        >
-          {o.label}
-        </button>
-      ))}
-    </div>
   );
 }

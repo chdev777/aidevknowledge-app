@@ -1,60 +1,86 @@
 import { useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { linksDb } from '../../lib/db/index.js';
 import { searchByFields } from '../../lib/utils/search.js';
 import { LINK_STATUS_VALUES, SOURCE_TYPES, type LinkStatus, type SourceType } from '../../types/link.js';
-import { ImportanceBadge, SourceTypeBadge, StatusBadge } from '../../components/shared/StatusBadge.js';
-import { TagList } from '../../components/shared/Tag.js';
+import { PageHeader } from '../../components/shared/PageHeader.js';
+import { FilterBar } from '../../components/shared/FilterBar.js';
+import { LinkRow } from '../../components/rows/LinkRow.js';
 import { EmptyState } from '../../components/shared/EmptyState.js';
 import { Spinner } from '../../components/shared/Spinner.js';
+import { Icon } from '../../components/shared/Icon.js';
 
-type StatusFilter = 'all' | LinkStatus;
 type SourceFilter = 'all' | SourceType;
+type StatusFilter = 'all' | LinkStatus;
 
 export function LinksPage() {
   const [, setParams] = useSearchParams();
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
-  const [sourceFilter, setSourceFilter] = useState<SourceFilter>('all');
+  const [source, setSource] = useState<SourceFilter>('all');
+  const [status, setStatus] = useState<StatusFilter>('all');
 
   const q = useQuery({
     queryKey: ['links', 'shared'],
     queryFn: () => linksDb.findShared({ count: 200 }),
   });
 
+  const all = q.data ?? [];
+
+  const sources = useMemo(
+    () => [
+      { key: 'all' as const, label: 'すべて', count: all.length },
+      ...SOURCE_TYPES.map((s) => ({
+        key: s,
+        label: s,
+        count: all.filter((l) => l.sourceType === s).length,
+      })),
+    ],
+    [all],
+  );
+
+  const statuses = useMemo(
+    () => [
+      { key: 'all' as const, label: 'すべて' },
+      ...LINK_STATUS_VALUES.map((s) => ({ key: s, label: s })),
+    ],
+    [],
+  );
+
   const filtered = useMemo(() => {
-    if (!q.data) return [];
     return searchByFields(
-      q.data.filter((l) => {
-        if (statusFilter !== 'all' && l.status !== statusFilter) return false;
-        if (sourceFilter !== 'all' && l.sourceType !== sourceFilter) return false;
+      all.filter((l) => {
+        if (source !== 'all' && l.sourceType !== source) return false;
+        if (status !== 'all' && l.status !== status) return false;
         return true;
       }),
       search,
       ['title', 'summary', 'userComment'],
     );
-  }, [q.data, search, statusFilter, sourceFilter]);
-
-  const compose = () => setParams({ compose: 'link' });
+  }, [all, search, source, status]);
 
   return (
     <div className="page">
-      <header className="page-head">
-        <div className="page-head-row">
-          <div>
-            <h1 className="page-title">URL共有</h1>
-            <p className="page-subtitle">
-              共有された外部URLの一覧。なぜ参考になるかが残されています。
-            </p>
-          </div>
-          <button type="button" className="btn btn-primary" onClick={compose}>
-            ＋ URLを共有
+      <PageHeader
+        eyebrow="01 · LINKS"
+        title="URL共有"
+        subtitle="外部の参考情報を、なぜ共有したのか・何に使えそうかと共に蓄積する。"
+        actions={
+          <button
+            type="button"
+            className="btn primary sm"
+            onClick={() => setParams({ compose: 'link' })}
+          >
+            <Icon name="plus" size={13} />
+            URLを共有
           </button>
-        </div>
-      </header>
+        }
+      />
 
-      <div className="list-toolbar">
+      <FilterBar filters={sources} value={source} onChange={setSource} groupLabel="種別" />
+      <FilterBar filters={statuses} value={status} onChange={setStatus} groupLabel="ステータス" />
+
+      <div style={{ padding: '14px 0 0' }}>
         <input
           type="search"
           placeholder="タイトル・概要・コメントで検索"
@@ -62,52 +88,22 @@ export function LinksPage() {
           onChange={(e) => setSearch(e.target.value)}
           className="list-search"
         />
-        <select
-          className="list-filter"
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
-        >
-          <option value="all">すべてのステータス</option>
-          {LINK_STATUS_VALUES.map((s) => (
-            <option key={s} value={s}>{s}</option>
-          ))}
-        </select>
-        <select
-          className="list-filter"
-          value={sourceFilter}
-          onChange={(e) => setSourceFilter(e.target.value as SourceFilter)}
-        >
-          <option value="all">すべての種別</option>
-          {SOURCE_TYPES.map((s) => (
-            <option key={s} value={s}>{s}</option>
-          ))}
-        </select>
       </div>
 
-      {q.isPending && <div className="section-loading"><Spinner /></div>}
+      {q.isPending && <Spinner />}
       {q.data && filtered.length === 0 && (
         <EmptyState
           title="該当するURLはありません"
           description="検索条件を変えるか、新規登録してください。"
         />
       )}
-      <ul className="row-list">
-        {filtered.map((l) => (
-          <li key={l.id} className="row-item">
-            <Link to={`/links/${l.id}`} className="row-link">
-              <div className="row-meta">
-                <SourceTypeBadge value={l.sourceType} />
-                <span className="mono row-domain">{l.domain}</span>
-                <ImportanceBadge value={l.importance} />
-                <StatusBadge value={l.status} />
-              </div>
-              <div className="row-title">{l.title}</div>
-              <div className="row-comment">{l.userComment || l.summary}</div>
-              <TagList names={l.tags} />
-            </Link>
-          </li>
-        ))}
-      </ul>
+      {filtered.length > 0 && (
+        <div style={{ borderTop: '1px solid var(--line)', marginTop: 14 }}>
+          {filtered.map((l) => (
+            <LinkRow key={l.id} link={l} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

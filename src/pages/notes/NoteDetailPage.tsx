@@ -1,13 +1,14 @@
-import { Link, useParams } from 'react-router-dom';
+import { Link as RouterLink, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { notesDb } from '../../lib/db/index.js';
-import { TagList } from '../../components/shared/Tag.js';
-import { VisibilityBadge } from '../../components/shared/VisibilityBadge.js';
+import { useUser } from '../../lib/firebase/use-user.js';
+import { Avatar } from '../../components/shell/Avatar.js';
 import { Markdown } from '../../components/shared/Markdown.js';
+import { Spinner } from '../../components/shared/Spinner.js';
 import { CommentList } from '../../components/comments/CommentList.js';
 import { CommentComposer } from '../../components/comments/CommentComposer.js';
-import { Spinner } from '../../components/shared/Spinner.js';
 import { ForbiddenPage } from '../ForbiddenPage.js';
+import { timeAgo } from '../../lib/utils/time.js';
 
 export function NoteDetailPage() {
   const { id = '' } = useParams();
@@ -16,11 +17,12 @@ export function NoteDetailPage() {
     queryFn: () => notesDb.findById(id),
     enabled: !!id,
   });
+  const author = useUser(q.data?.createdBy);
 
   if (q.isPending) {
     return (
       <div className="page">
-        <div className="section-loading"><Spinner /></div>
+        <Spinner />
       </div>
     );
   }
@@ -30,48 +32,86 @@ export function NoteDetailPage() {
 
   return (
     <div className="page">
-      <header className="page-head">
-        <div className="row-meta">
-          <VisibilityBadge value={n.visibility} />
-        </div>
-        <h1 className="page-title">{n.title}</h1>
-      </header>
+      <RouterLink to="/notes" className="btn ghost sm" style={{ marginBottom: 16 }}>
+        ← 検証メモに戻る
+      </RouterLink>
 
-      <section className="page-section note-section">
-        <div className="note-block">
-          <h3 className="note-label mono">目的</h3>
-          <div className="prose"><Markdown>{n.purpose || '（未記入）'}</Markdown></div>
-        </div>
-        <div className="note-block">
-          <h3 className="note-label mono">試したこと</h3>
-          <div className="prose"><Markdown>{n.tried || '（未記入）'}</Markdown></div>
-        </div>
-        <div className="note-block">
-          <h3 className="note-label mono">結果</h3>
-          <div className="prose"><Markdown>{n.result || '（未記入）'}</Markdown></div>
-        </div>
-        <div className="note-block">
-          <h3 className="note-label mono">結論</h3>
-          <div className="prose"><Markdown>{n.conclusion || '（未記入）'}</Markdown></div>
-        </div>
-      </section>
+      <div className="detail-layout">
+        <div>
+          <div className="detail-eyebrow">VERIFICATION NOTE · #{id.toUpperCase()}</div>
+          <h1 className="detail-title">{n.title}</h1>
+          <div className="detail-meta">
+            {author.data && <Avatar user={author.data} size="sm" />}
+            {author.data && <span>{author.data.name}</span>}
+            <span className="dot-sep">·</span>
+            <span>{timeAgo(n.createdAt)}</span>
+          </div>
 
-      <section className="page-section">
-        <TagList names={n.tags} />
-      </section>
+          <div className="note-fields">
+            <div className="note-field">
+              <div className="note-field-label">目的</div>
+              <div className="note-field-value">
+                <Markdown>{n.purpose || '（未記入）'}</Markdown>
+              </div>
+            </div>
+            <div className="note-field">
+              <div className="note-field-label">試したこと</div>
+              <div className="note-field-value">
+                <Markdown>{n.tried || '（未記入）'}</Markdown>
+              </div>
+            </div>
+            <div className="note-field">
+              <div className="note-field-label">結果</div>
+              <div className="note-field-value">
+                <Markdown>{n.result || '（未記入）'}</Markdown>
+              </div>
+            </div>
+            <div className="note-field">
+              <div className="note-field-label">結論</div>
+              <div className="note-field-value" style={{ color: 'var(--ink)' }}>
+                <Markdown>{n.conclusion || '（未記入）'}</Markdown>
+              </div>
+            </div>
+          </div>
 
-      <section className="page-section">
-        <h2 className="section-title">コメント</h2>
-        <CommentComposer
-          targetType="note"
-          targetId={n.id}
-          targetVisibility={n.visibility}
-        />
-        <CommentList targetType="note" targetId={n.id} />
-      </section>
+          <div style={{ marginTop: 26 }}>
+            <div className="section-title">コメント</div>
+            <CommentComposer
+              targetType="note"
+              targetId={n.id}
+              targetVisibility={n.visibility}
+            />
+            <CommentList targetType="note" targetId={n.id} />
+          </div>
+        </div>
 
-      <div className="page-foot">
-        <Link to="/notes" className="btn">← 一覧に戻る</Link>
+        <aside className="detail-aside">
+          <div className="aside-section">
+            <div className="aside-label">作成者</div>
+            <div className="aside-value" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {author.data && <Avatar user={author.data} size="sm" />}
+              {author.data?.name ?? '—'}
+            </div>
+          </div>
+          <div className="aside-section">
+            <div className="aside-label">タグ</div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {n.tags.map((t) => (
+                <span key={t} className="tag"><span className="tag-dot" />{t}</span>
+              ))}
+            </div>
+          </div>
+          <div className="aside-section">
+            <div className="aside-label">関連URL</div>
+            <div className="aside-value mono">{n.links?.length ?? 0}</div>
+          </div>
+          <div className="aside-section">
+            <div className="aside-label">作成日時</div>
+            <div className="aside-value mono" style={{ fontSize: 12 }}>
+              {n.createdAt.toLocaleString('ja-JP')}
+            </div>
+          </div>
+        </aside>
       </div>
     </div>
   );
