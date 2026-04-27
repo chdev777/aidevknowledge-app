@@ -26,8 +26,10 @@ export function FavoritesPage() {
     enabled: !!uid,
   });
 
+  const hasFavorites = (favsQ.data?.length ?? 0) > 0;
+
   const itemsQ = useQuery({
-    queryKey: ['favorites', uid, 'items'],
+    queryKey: ['favorites', uid, 'items', favsQ.data?.map((f) => f.id).join(',')],
     queryFn: async () => {
       const favs = favsQ.data ?? [];
       const result = await Promise.all(
@@ -53,10 +55,14 @@ export function FavoritesPage() {
       );
       return result.filter((x): x is ResolvedFavorite => !!x);
     },
-    enabled: !!favsQ.data && (favsQ.data?.length ?? 0) > 0,
+    enabled: hasFavorites,
   });
 
   const items = itemsQ.data ?? [];
+  // TanStack Query v5: enabled:false のクエリは isPending=true のままなので、
+  // 「実際にネットワーク待ち」を判定するには isFetching を使う。
+  const loading = favsQ.isFetching || (hasFavorites && itemsQ.isFetching);
+  const showEmpty = !loading && favsQ.data && favsQ.data.length === 0;
 
   return (
     <div className="page">
@@ -66,16 +72,16 @@ export function FavoritesPage() {
         subtitle="あなたがピン留めしたURL・メモ・質問・アプリ。"
       />
 
-      {(favsQ.isPending || itemsQ.isPending) && <Spinner />}
+      {loading && <Spinner />}
 
-      {favsQ.data && favsQ.data.length === 0 && (
+      {showEmpty && (
         <EmptyState
           title="お気に入りはまだありません"
           description="各詳細ページのサイドバーから「☆ お気に入り」を押して追加できます。"
         />
       )}
 
-      {items.length > 0 && (
+      {!loading && items.length > 0 && (
         <div style={{ borderTop: '1px solid var(--line)', marginTop: 14 }}>
           {items.map((it) => {
             if (it.kind === 'link') return <LinkRow key={`l-${it.item.id}`} link={it.item} />;
