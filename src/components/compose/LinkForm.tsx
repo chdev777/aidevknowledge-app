@@ -76,18 +76,25 @@ export function LinkForm({ onDone }: { onDone: (id: string) => void }) {
         );
         return;
       }
+      // 複数フィールドを一度に更新する。set() を連続で呼ぶと毎回 draft の
+      // クロージャ値からマージするため、最後の set 以外が失われる（React の
+      // setState は関数版でない限りバッチで上書きする）。
+      const patch: Partial<DraftState> = {};
       const filled: string[] = [];
       if (og.title && !draft.title) {
-        set('title', og.title);
+        patch.title = og.title;
         filled.push('タイトル');
       }
       if (og.description && !draft.summary) {
-        set('summary', og.description);
+        patch.summary = og.description;
         filled.push('概要');
       }
       if (og.image && !draft.thumbnailUrl) {
-        set('thumbnailUrl', og.image);
+        patch.thumbnailUrl = og.image;
         filled.push('サムネイル');
+      }
+      if (Object.keys(patch).length > 0) {
+        setDraft({ ...draft, ...patch });
       }
       setMetaInfo(
         filled.length > 0
