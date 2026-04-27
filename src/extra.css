@@ -1035,6 +1035,112 @@
 .markdown-body a { color: var(--accent-ink); }
 .markdown-body ul, .markdown-body ol { padding-left: 22px; margin: 6px 0; }
 
+/* ----- QA detail / Answers ----- */
+.accepted-mark {
+  color: var(--accent-ink);
+  background: var(--accent-soft);
+  border: 1px solid oklch(0.85 0.10 65);
+  font-size: 10px;
+  padding: 1px 8px;
+  border-radius: 999px;
+}
+.answer-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.answer-item {
+  display: grid;
+  grid-template-columns: 64px 1fr;
+  gap: 14px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--bg-raised);
+}
+.answer-item.is-accepted {
+  border-color: oklch(0.85 0.10 65);
+  background: linear-gradient(0deg, oklch(0.99 0.02 65 / 0.6), var(--bg-raised));
+}
+.answer-vote {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding-top: 4px;
+}
+.answer-vote .btn { padding: 2px 6px; font-size: 12px; }
+.answer-vote-count {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.answer-body { min-width: 0; }
+.answer-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 12px;
+}
+.answer-author { color: var(--ink-3); }
+.answer-time { color: var(--ink-4); margin-left: auto; }
+
+/* ----- Notes detail ----- */
+.note-section {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.note-block {
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: 14px 16px;
+}
+.note-label {
+  font-size: 11px;
+  color: var(--ink-3);
+  margin: 0 0 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* ----- Apps detail ----- */
+.app-spec-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.spec-cell {
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: 12px 14px;
+}
+.spec-label {
+  font-size: 11px;
+  color: var(--ink-4);
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.spec-value {
+  font-size: 13px;
+  color: var(--ink);
+}
+.app-caution {
+  background: oklch(0.97 0.04 25);
+  border: 1px solid oklch(0.85 0.06 25);
+  border-radius: var(--radius-lg);
+  padding: 14px 18px;
+}
+.app-caution .section-title { color: oklch(0.40 0.18 25); }
+
 /* ----- Sidebar nav 補強（プロトタイプは内部state/divベース、ここはNavLink/aタグ用） ----- */
 .sidebar-nav {
   flex: 1;
