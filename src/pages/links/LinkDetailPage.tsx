@@ -69,6 +69,27 @@ export function LinkDetailPage() {
             </a>
           )}
 
+          {l.thumbnailUrl && (
+            <div style={{ marginBottom: 26 }}>
+              <img
+                src={l.thumbnailUrl}
+                alt=""
+                loading="lazy"
+                style={{
+                  width: '100%',
+                  maxHeight: 360,
+                  objectFit: 'cover',
+                  borderRadius: 8,
+                  border: '1px solid var(--line)',
+                  background: 'var(--bg-2)',
+                }}
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).style.display = 'none';
+                }}
+              />
+            </div>
+          )}
+
           {l.summary && (
             <div style={{ marginBottom: 26 }}>
               <div className="section-title">概要</div>

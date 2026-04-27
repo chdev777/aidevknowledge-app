@@ -187,6 +187,61 @@ export function LinkForm({ onDone }: { onDone: (id: string) => void }) {
         )}
       </label>
 
+      {draft.thumbnailUrl && (
+        <div className="auth-field">
+          <span>サムネイル</span>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: 12,
+              padding: 8,
+              border: '1px solid var(--line)',
+              borderRadius: 8,
+              background: 'var(--bg-2)',
+            }}
+          >
+            <img
+              src={draft.thumbnailUrl}
+              alt="thumbnail"
+              loading="lazy"
+              style={{
+                width: 160,
+                height: 90,
+                objectFit: 'cover',
+                borderRadius: 6,
+                border: '1px solid var(--line)',
+                flexShrink: 0,
+                background: 'var(--bg-raised)',
+              }}
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).style.display = 'none';
+              }}
+            />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div
+                className="mono"
+                style={{
+                  fontSize: 10,
+                  color: 'var(--ink-4)',
+                  wordBreak: 'break-all',
+                  marginBottom: 6,
+                }}
+              >
+                {draft.thumbnailUrl}
+              </div>
+              <button
+                type="button"
+                className="btn ghost xs"
+                onClick={() => set('thumbnailUrl', '')}
+              >
+                クリア
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <label className="auth-field">
         <span>タイトル</span>
         <input
