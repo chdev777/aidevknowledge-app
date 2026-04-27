@@ -14,9 +14,10 @@ export default defineConfig({
     port: 3000,
     strictPort: true,
     watch: {
-      // Docker × Windows での HMR 対応（CPU 負荷高め）
-      usePolling: true,
-      interval: 500,
+      // Docker Desktop (WSL2) では bind mount に対する inotify が動くので polling 不要。
+      // 旧 Hyper-V backend では usePolling: true が必要だった経緯あり。
+      // node_modules は監視対象外（HMR 不要、CPU 削減）。
+      ignored: ['**/node_modules/**', '**/.git/**', '**/.emulator-data/**', '**/dist/**'],
     },
   },
   optimizeDeps: {

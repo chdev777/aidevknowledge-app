@@ -92,6 +92,8 @@ export function MyPage() {
     setParams(next);
   };
 
+  if (!uid) return null;
+
   return (
     <div className="page">
       <header className="me-header">

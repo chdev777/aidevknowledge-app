@@ -7,6 +7,10 @@ dist/
 build/
 *.tsbuildinfo
 
+# tsc -b の旧 emit 残骸（noEmit:true で今後は出ない。既存分は手動削除可）
+src/**/*.js
+src/**/*.js.map
+
 # Environment
 .env
 .env.local

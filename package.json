@@ -5,10 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port 3000",
-    "build": "tsc -b && vite build",
+    "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host 0.0.0.0",
-    "test": "vitest run --dir src/test/unit",
-    "test:rules": "vitest run --dir src/test/rules",
+    "test": "vitest run src/test/unit",
+    "test:rules": "vitest run src/test/rules --no-file-parallelism",
     "test:watch": "vitest",
     "lint": "tsc --noEmit",
     "seed": "FIRESTORE_EMULATOR_HOST=firebase-emulator:8080 FIREBASE_AUTH_EMULATOR_HOST=firebase-emulator:9099 GCLOUD_PROJECT=aidev-knowledge-dev tsx tools/scripts/seed.ts",

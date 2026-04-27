@@ -11,13 +11,23 @@ setLogLevel('error');
 
 const PROJECT_ID = 'aidev-knowledge-test';
 
+function parseEmulatorHost(): { host: string; port: number } {
+  const raw = process.env.FIRESTORE_EMULATOR_HOST?.trim();
+  if (raw) {
+    const [host, port] = raw.split(':');
+    if (host && port) return { host, port: Number(port) };
+  }
+  return { host: '127.0.0.1', port: 8080 };
+}
+
 export async function makeEnv(): Promise<RulesTestEnvironment> {
+  const { host, port } = parseEmulatorHost();
   return initializeTestEnvironment({
     projectId: PROJECT_ID,
     firestore: {
       rules: readFileSync(resolve(process.cwd(), 'firestore.rules'), 'utf8'),
-      host: '127.0.0.1',
-      port: 8080,
+      host,
+      port,
     },
   });
 }

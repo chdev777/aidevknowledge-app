@@ -22,7 +22,7 @@ export function matches(haystack: string, query: string): boolean {
     .every((term) => target.includes(normalize(term)));
 }
 
-export function searchByFields<T extends Record<string, unknown>>(
+export function searchByFields<T>(
   items: T[],
   query: string,
   fields: (keyof T)[],

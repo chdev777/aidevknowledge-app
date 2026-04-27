@@ -2,11 +2,13 @@ import { z } from 'zod';
 
 export const visibilitySchema = z.enum(['private', 'shared']);
 
-/** タグ自由入力。trim + 重複除去 + 32文字以内 + 最大10個 */
+/** タグ自由入力。trim + 重複除去 + 空除去 + 32文字以内 + 最大10個 */
 export const tagsSchema = z
-  .array(z.string().trim().min(1).max(32))
-  .max(10)
-  .transform((arr) => Array.from(new Set(arr.map((s) => s.trim()).filter(Boolean))));
+  .array(z.string())
+  .transform((arr) =>
+    Array.from(new Set(arr.map((s) => s.trim()).filter(Boolean))),
+  )
+  .pipe(z.array(z.string().max(32)).max(10));
 
 /** http/https のみ許可（javascript: 等は拒否） */
 export const safeUrlSchema = z
