@@ -2,24 +2,31 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 const KEY = (kind: string) => `aidev:draft:${kind}`;
 
+export interface UseDraftResult<T> {
+  value: T;
+  set: (next: T) => void;
+  clear: () => void;
+  /** mount 時に localStorage から復元されたかどうか */
+  wasRestored: boolean;
+}
+
 /**
  * ComposeModal の下書き自動保存（localStorage、debounce 500ms）
  *
  * - kind 単位（link/question/note/app）に1件だけ
  * - submit 成功時は clear() を呼ぶ
+ * - キャンセル時は残す（誤閉じ復帰のため）。再表示時に wasRestored:true で
+ *   バナー表示すること
  */
-export function useDraft<T>(
-  kind: string,
-  initial: T,
-): [T, (next: T) => void, () => void] {
-  const [value, setValue] = useState<T>(() => {
+export function useDraft<T>(kind: string, initial: T): UseDraftResult<T> {
+  const [{ value, wasRestored }, setState] = useState<{ value: T; wasRestored: boolean }>(() => {
     try {
       const raw = localStorage.getItem(KEY(kind));
-      if (raw) return { ...initial, ...JSON.parse(raw) };
+      if (raw) return { value: { ...initial, ...JSON.parse(raw) }, wasRestored: true };
     } catch {
       /* ignore */
     }
-    return initial;
+    return { value: initial, wasRestored: false };
   });
 
   const timer = useRef<number | null>(null);
@@ -40,9 +47,9 @@ export function useDraft<T>(
     };
   }, [kind, value]);
 
-  const update = useCallback((next: T) => {
+  const set = useCallback((next: T) => {
     dirty.current = true;
-    setValue(next);
+    setState((prev) => ({ value: next, wasRestored: prev.wasRestored }));
   }, []);
 
   const clear = useCallback(() => {
@@ -52,8 +59,8 @@ export function useDraft<T>(
     } catch {
       /* ignore */
     }
-    setValue(initial);
+    setState({ value: initial, wasRestored: false });
   }, [kind, initial]);
 
-  return [value, update, clear];
+  return { value, set, clear, wasRestored };
 }

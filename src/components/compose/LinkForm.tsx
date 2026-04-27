@@ -18,6 +18,7 @@ import { Spinner } from '../shared/Spinner.js';
 import { TagInput } from './TagInput.js';
 import { VisibilityRadio } from './VisibilityRadio.js';
 import { useDraft } from './useDraft.js';
+import { DraftRestoredBanner } from './DraftRestoredBanner.js';
 
 interface DraftState {
   url: string;
@@ -46,7 +47,7 @@ const INITIAL: DraftState = {
 export function LinkForm({ onDone }: { onDone: (id: string) => void }) {
   const { fbUser } = useAuth();
   const qc = useQueryClient();
-  const [draft, setDraft, clearDraft] = useDraft<DraftState>('link', INITIAL);
+  const { value: draft, set: setDraft, clear: clearDraft, wasRestored } = useDraft<DraftState>('link', INITIAL);
   const [error, setError] = useState<string | null>(null);
   const [metaInfo, setMetaInfo] = useState<string | null>(null);
   const [fetching, setFetching] = useState(false);
@@ -150,6 +151,7 @@ export function LinkForm({ onDone }: { onDone: (id: string) => void }) {
 
   return (
     <form onSubmit={onSubmit} className="compose-form">
+      <DraftRestoredBanner visible={wasRestored} onDiscard={clearDraft} />
       <label className="auth-field">
         <span>URL</span>
         <input

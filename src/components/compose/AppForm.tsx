@@ -10,6 +10,7 @@ import { Spinner } from '../shared/Spinner.js';
 import { TagInput } from './TagInput.js';
 import { VisibilityRadio } from './VisibilityRadio.js';
 import { useDraft } from './useDraft.js';
+import { DraftRestoredBanner } from './DraftRestoredBanner.js';
 
 interface DraftState {
   name: string;
@@ -42,7 +43,7 @@ const INITIAL: DraftState = {
 export function AppForm({ onDone }: { onDone: (id: string) => void }) {
   const { fbUser } = useAuth();
   const qc = useQueryClient();
-  const [draft, setDraft, clearDraft] = useDraft<DraftState>('app', INITIAL);
+  const { value: draft, set: setDraft, clear: clearDraft, wasRestored } = useDraft<DraftState>('app', INITIAL);
   const [error, setError] = useState<string | null>(null);
 
   const set = <K extends keyof DraftState>(k: K, v: DraftState[K]) =>
@@ -96,6 +97,7 @@ export function AppForm({ onDone }: { onDone: (id: string) => void }) {
 
   return (
     <form className="compose-form" onSubmit={onSubmit}>
+      <DraftRestoredBanner visible={wasRestored} onDiscard={clearDraft} />
       <label className="auth-field">
         <span>アプリ名</span>
         <input required value={draft.name} onChange={(e) => set('name', e.target.value)} />

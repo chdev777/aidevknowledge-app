@@ -10,6 +10,7 @@ import { Spinner } from '../shared/Spinner.js';
 import { TagInput } from './TagInput.js';
 import { VisibilityRadio } from './VisibilityRadio.js';
 import { useDraft } from './useDraft.js';
+import { DraftRestoredBanner } from './DraftRestoredBanner.js';
 
 interface DraftState {
   title: string;
@@ -28,7 +29,7 @@ const INITIAL: DraftState = {
 export function QuestionForm({ onDone }: { onDone: (id: string) => void }) {
   const { fbUser } = useAuth();
   const qc = useQueryClient();
-  const [draft, setDraft, clearDraft] = useDraft<DraftState>('question', INITIAL);
+  const { value: draft, set: setDraft, clear: clearDraft, wasRestored } = useDraft<DraftState>('question', INITIAL);
   const [error, setError] = useState<string | null>(null);
 
   const set = <K extends keyof DraftState>(k: K, v: DraftState[K]) =>
@@ -70,6 +71,7 @@ export function QuestionForm({ onDone }: { onDone: (id: string) => void }) {
 
   return (
     <form className="compose-form" onSubmit={onSubmit}>
+      <DraftRestoredBanner visible={wasRestored} onDiscard={clearDraft} />
       <label className="auth-field">
         <span>タイトル</span>
         <input
