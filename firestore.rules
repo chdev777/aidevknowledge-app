@@ -1,10 +1,259 @@
 rules_version = '2';
-// 仮ルール（Step 4.5 で全コレクションに対する強化版を実装する）
-// PoC初動チェック用：認証必須のみ
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if request.auth != null;
+
+    // ========================================
+    // 共通ヘルパ
+    // ========================================
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function ownerOf(d) {
+      return signedIn() && request.auth.uid == d.createdBy;
+    }
+
+    function shared(d) {
+      return d.visibility == 'shared';
+    }
+
+    function visibleTo(d) {
+      return shared(d) || ownerOf(d);
+    }
+
+    /** 投稿系コレクション共通の create バリデーション */
+    function commonCreate(d) {
+      return signedIn()
+        && d.createdBy == request.auth.uid
+        && d.createdAt == request.time
+        && d.visibility in ['private', 'shared']
+        && d.tags is list
+        && d.tags.size() <= 10;
+    }
+
+    /** update 時に変更不可なフィールド（所有権・タイムスタンプ） */
+    function immutableOnUpdate(prev, next) {
+      return next.createdBy == prev.createdBy
+        && next.createdAt == prev.createdAt;
+    }
+
+    function isString(d, field, max) {
+      return d[field] is string && d[field].size() > 0 && d[field].size() <= max;
+    }
+
+    // ========================================
+    // users — public profile
+    // ========================================
+    match /users/{uid} {
+      allow read: if signedIn();
+
+      allow create: if signedIn()
+        && request.auth.uid == uid
+        // 自己申告できる role は限定（管理者は招待のみ）
+        && request.resource.data.role in ['DX推進', '情報支援']
+        && request.resource.data.handle is string
+        && request.resource.data.handle.size() >= 3
+        && request.resource.data.handle.size() <= 32
+        && request.resource.data.handle.matches('^[a-zA-Z0-9_.-]+$');
+
+      allow update: if signedIn()
+        && request.auth.uid == uid
+        // role 改ざん禁止（昇格防止）
+        && request.resource.data.role == resource.data.role
+        // handle 変更禁止（ユニーク制約維持）
+        && request.resource.data.handle == resource.data.handle;
+
+      allow delete: if false;
+
+      // 個人情報サブドキュメント
+      match /private/{docId} {
+        allow read, write: if signedIn() && request.auth.uid == uid;
+      }
+    }
+
+    // ========================================
+    // handles — ユニーク制約用ロックドキュメント
+    // ========================================
+    match /handles/{handle} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.uid == request.auth.uid
+        && handle.matches('^[a-zA-Z0-9_.-]+$')
+        && handle.size() >= 3
+        && handle.size() <= 32;
+      allow update, delete: if false;
+    }
+
+    // ========================================
+    // links / notes / apps — 投稿系（同パターン）
+    // ========================================
+    match /links/{id} {
+      allow read: if signedIn() && visibleTo(resource.data);
+      allow create: if commonCreate(request.resource.data)
+        && isString(request.resource.data, 'title', 200)
+        && isString(request.resource.data, 'url', 2000)
+        && request.resource.data.url.matches('^https?://.+')
+        && request.resource.data.userComment is string
+        && request.resource.data.userComment.size() <= 2000
+        && request.resource.data.summary is string
+        && request.resource.data.summary.size() <= 2000;
+      allow update: if ownerOf(resource.data)
+        && immutableOnUpdate(resource.data, request.resource.data)
+        && request.resource.data.tags is list
+        && request.resource.data.tags.size() <= 10;
+      allow delete: if ownerOf(resource.data);
+    }
+
+    match /notes/{id} {
+      allow read: if signedIn() && visibleTo(resource.data);
+      allow create: if commonCreate(request.resource.data)
+        && isString(request.resource.data, 'title', 200)
+        && request.resource.data.purpose is string
+        && request.resource.data.purpose.size() <= 4000
+        && request.resource.data.tried is string
+        && request.resource.data.tried.size() <= 8000
+        && request.resource.data.result is string
+        && request.resource.data.result.size() <= 4000
+        && request.resource.data.conclusion is string
+        && request.resource.data.conclusion.size() <= 2000;
+      allow update: if ownerOf(resource.data)
+        && immutableOnUpdate(resource.data, request.resource.data);
+      allow delete: if ownerOf(resource.data);
+    }
+
+    match /apps/{id} {
+      allow read: if signedIn() && visibleTo(resource.data);
+      allow create: if commonCreate(request.resource.data)
+        && isString(request.resource.data, 'name', 200)
+        && isString(request.resource.data, 'url', 2000)
+        && request.resource.data.url.matches('^https?://.+')
+        && request.resource.data.summary is string
+        && request.resource.data.summary.size() <= 4000
+        && request.resource.data.purpose is string
+        && request.resource.data.purpose.size() <= 4000
+        && request.resource.data.caution is string
+        && request.resource.data.caution.size() <= 2000
+        && request.resource.data.stats.views == 0
+        && request.resource.data.stats.comments == 0
+        && request.resource.data.stats.likes == 0;
+      allow update: if ownerOf(resource.data)
+        && immutableOnUpdate(resource.data, request.resource.data);
+      allow delete: if ownerOf(resource.data);
+    }
+
+    // ========================================
+    // questions — 採用回答 / 投票
+    // ========================================
+    match /questions/{id} {
+      allow read: if signedIn() && visibleTo(resource.data);
+      allow create: if commonCreate(request.resource.data)
+        && isString(request.resource.data, 'title', 200)
+        && request.resource.data.body is string
+        && request.resource.data.body.size() <= 8000
+        && request.resource.data.answerCount == 0
+        && !('acceptedAnswerId' in request.resource.data);
+      // 質問本人だけが本文編集可能
+      allow update: if ownerOf(resource.data)
+        && immutableOnUpdate(resource.data, request.resource.data);
+      allow delete: if ownerOf(resource.data);
+
+      // 回答（サブコレクション）
+      match /answers/{aid} {
+        function parentQuestion() {
+          return get(/databases/$(database)/documents/questions/$(id)).data;
+        }
+        function isQuestionOwner() {
+          return signedIn() && request.auth.uid == parentQuestion().createdBy;
+        }
+
+        allow read: if signedIn() && visibleTo(parentQuestion());
+
+        allow create: if signedIn()
+          && request.resource.data.createdBy == request.auth.uid
+          && request.resource.data.createdAt == request.time
+          && request.resource.data.body is string
+          && request.resource.data.body.size() > 0
+          && request.resource.data.body.size() <= 8000
+          && request.resource.data.votes == 0
+          && request.resource.data.accepted == false;
+
+        // update は3パターン：投稿者本文編集 / 質問者の採用変更 / 投票 ±1
+        allow update: if (
+          ownerOf(resource.data)
+          && immutableOnUpdate(resource.data, request.resource.data)
+          && request.resource.data.votes == resource.data.votes
+          && request.resource.data.accepted == resource.data.accepted
+        ) || (
+          isQuestionOwner()
+          && request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['accepted', 'updatedAt'])
+        ) || (
+          signedIn()
+          && request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['votes', 'updatedAt'])
+          && (
+            request.resource.data.votes == resource.data.votes + 1
+            || request.resource.data.votes == resource.data.votes - 1
+          )
+        );
+
+        allow delete: if ownerOf(resource.data);
+      }
+    }
+
+    // ========================================
+    // comments — 親doc visibility を非正規化保持
+    // ========================================
+    match /comments/{id} {
+      allow read: if signedIn()
+        && (resource.data.targetVisibility == 'shared' || ownerOf(resource.data));
+
+      allow create: if signedIn()
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.targetVisibility in ['private', 'shared']
+        && request.resource.data.targetType in ['link', 'question', 'note', 'app']
+        && request.resource.data.targetId is string
+        && request.resource.data.targetId.size() > 0
+        && request.resource.data.type in [
+            '感想',
+            '改善提案',
+            '不具合報告',
+            '活用アイデア',
+            '技術メモ',
+            'セキュリティ指摘'
+          ]
+        && request.resource.data.body is string
+        && request.resource.data.body.size() > 0
+        && request.resource.data.body.size() <= 2000;
+
+      allow update: if ownerOf(resource.data)
+        && immutableOnUpdate(resource.data, request.resource.data)
+        && request.resource.data.targetType == resource.data.targetType
+        && request.resource.data.targetId == resource.data.targetId;
+
+      allow delete: if ownerOf(resource.data);
+    }
+
+    // ========================================
+    // tags / projects — read のみ（書込は admin SDK）
+    // ========================================
+    match /tags/{id} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
+    match /projects/{id} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
+    // ========================================
+    // favorites — 本人のみ
+    // ========================================
+    match /favorites/{uid}/items/{id} {
+      allow read, write: if signedIn() && request.auth.uid == uid;
     }
   }
 }
