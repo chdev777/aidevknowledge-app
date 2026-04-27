@@ -1141,6 +1141,158 @@
 }
 .app-caution .section-title { color: oklch(0.40 0.18 25); }
 
+/* ----- MyPage ----- */
+.me-header {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding-bottom: 24px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid var(--line);
+}
+.me-header-meta {
+  flex: 1;
+  min-width: 0;
+}
+.me-name {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 600;
+  margin: 0;
+}
+.me-handle {
+  font-size: 12px;
+  color: var(--ink-3);
+  margin-top: 2px;
+}
+.me-quick-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.me-metrics {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+  margin-bottom: 24px;
+}
+.me-metric {
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: 14px 16px;
+}
+.me-metric-label {
+  font-size: 11px;
+  color: var(--ink-4);
+  margin-bottom: 6px;
+}
+.me-metric-total {
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.me-metric-sub {
+  display: flex;
+  gap: 10px;
+  font-size: 11px;
+  color: var(--ink-3);
+  margin-top: 4px;
+}
+
+.me-tabs {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 16px;
+}
+.me-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  font-size: 13px;
+  color: var(--ink-3);
+  cursor: pointer;
+  margin-bottom: -1px;
+}
+.me-tab:hover { color: var(--ink); }
+.me-tab.is-active {
+  color: var(--ink);
+  border-bottom-color: var(--accent);
+  font-weight: 500;
+}
+.me-tab.is-disabled {
+  color: var(--ink-4);
+  cursor: not-allowed;
+}
+.me-tab-count {
+  font-size: 11px;
+  color: var(--ink-4);
+  background: var(--bg-2);
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+}
+.me-tab.is-active .me-tab-count {
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  border-color: oklch(0.85 0.10 65);
+}
+
+.me-vis-filter {
+  margin-bottom: 12px;
+}
+
+.segmented {
+  display: inline-flex;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--bg-raised);
+}
+.segmented-item {
+  padding: 6px 14px;
+  font-size: 12px;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  color: var(--ink-3);
+  border-right: 1px solid var(--line);
+}
+.segmented-item:last-child { border-right: 0; }
+.segmented-item.is-active {
+  background: var(--ink);
+  color: var(--bg);
+  border-right-color: var(--ink);
+}
+
+.me-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  align-items: center;
+}
+.me-row-main { min-width: 0; }
+.me-row-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.comment-target-link {
+  font-size: 11px;
+  color: var(--accent-ink);
+  text-decoration: none;
+}
+.comment-target-link:hover { text-decoration: underline; }
+
 /* ----- Sidebar nav 補強（プロトタイプは内部state/divベース、ここはNavLink/aタグ用） ----- */
 .sidebar-nav {
   flex: 1;
