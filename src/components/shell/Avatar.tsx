@@ -14,7 +14,7 @@ export function Avatar({ user, size = 'sm' }: Props) {
     .slice(0, 2);
   return (
     <span
-      className={`avatar avatar-${size}`}
+      className={`avatar ${size}`}
       style={{
         background: `${user.color}22`,
         color: user.color,

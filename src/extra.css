@@ -1336,3 +1336,145 @@
   border: 1px solid var(--line-2);
   font-weight: 500;
 }
+
+/* ============================================================
+   Tweaks: テーマ / アクセント / 情報密度の実行時切り替え
+   ============================================================ */
+
+/* ----- アクセントカラー ----- */
+body[data-accent="indigo"] {
+  --accent: oklch(0.55 0.16 265);
+  --accent-soft: oklch(0.92 0.05 265);
+  --accent-ink: oklch(0.35 0.14 265);
+}
+body[data-accent="forest"] {
+  --accent: oklch(0.50 0.13 150);
+  --accent-soft: oklch(0.92 0.04 150);
+  --accent-ink: oklch(0.32 0.10 150);
+}
+
+/* ----- ダークテーマ ----- */
+body[data-theme="dark"] {
+  --bg: oklch(0.18 0.008 60);
+  --bg-2: oklch(0.22 0.008 60);
+  --bg-raised: oklch(0.25 0.008 60);
+  --ink: oklch(0.95 0.005 60);
+  --ink-2: oklch(0.80 0.005 60);
+  --ink-3: oklch(0.62 0.005 60);
+  --ink-4: oklch(0.45 0.005 60);
+  --line: oklch(0.32 0.008 60);
+  --line-2: oklch(0.28 0.008 60);
+  --line-3: oklch(0.30 0.008 60);
+  --accent-soft: oklch(0.32 0.10 55);
+}
+body[data-theme="dark"][data-accent="indigo"] {
+  --accent-soft: oklch(0.28 0.10 265);
+}
+body[data-theme="dark"][data-accent="forest"] {
+  --accent-soft: oklch(0.28 0.08 150);
+}
+
+/* ----- Tweaks トグルボタン (右下フローティング) ----- */
+.tweaks-toggle {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 90;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--bg-raised);
+  color: var(--ink-2);
+  font-size: 16px;
+  cursor: pointer;
+  box-shadow: 0 4px 12px -4px oklch(0.22 0.01 60 / 0.18);
+  transition: transform 120ms, border-color 120ms;
+}
+.tweaks-toggle:hover {
+  border-color: var(--ink-4);
+  transform: translateY(-1px);
+}
+
+/* ----- Tweaks パネル ----- */
+.tweaks-panel {
+  position: fixed;
+  right: 16px;
+  bottom: 60px;
+  z-index: 95;
+  width: 280px;
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px -8px oklch(0.22 0.01 60 / 0.25);
+  font-size: 12px;
+  color: var(--ink);
+  overflow: hidden;
+}
+.tweaks-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 8px 10px 14px;
+  border-bottom: 1px solid var(--line-2);
+}
+.tweaks-head b {
+  font-size: 12px;
+  font-weight: 600;
+}
+.tweaks-close {
+  border: 0;
+  background: transparent;
+  color: var(--ink-3);
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.tweaks-close:hover {
+  background: var(--line-3);
+  color: var(--ink);
+}
+.tweaks-body {
+  padding: 12px 14px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.tweaks-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.tweaks-lbl {
+  font-size: 11px;
+  color: var(--ink-3);
+}
+.tweaks-seg {
+  display: flex;
+  padding: 2px;
+  background: var(--bg-2);
+  border-radius: 8px;
+  border: 1px solid var(--line-2);
+}
+.tweaks-seg-btn {
+  flex: 1;
+  height: 24px;
+  border: 0;
+  background: transparent;
+  color: var(--ink-2);
+  font-size: 11px;
+  font-weight: 500;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 120ms, color 120ms;
+}
+.tweaks-seg-btn:hover {
+  color: var(--ink);
+}
+.tweaks-seg-btn.is-active {
+  background: var(--bg-raised);
+  color: var(--ink);
+  box-shadow: 0 1px 2px oklch(0.22 0.01 60 / 0.08);
+}
