@@ -1,6 +1,6 @@
 import { initializeApp, type FirebaseOptions } from 'firebase/app';
 import { getAuth, connectAuthEmulator } from 'firebase/auth';
-import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
+import { connectFirestoreEmulator, initializeFirestore } from 'firebase/firestore';
 
 const useEmulator = import.meta.env.VITE_USE_EMULATOR === '1';
 
@@ -15,7 +15,13 @@ const config: FirebaseOptions = {
 
 export const app = initializeApp(config);
 export const auth = getAuth(app);
-export const db = getFirestore(app);
+// initializeFirestore で ignoreUndefinedProperties:true を設定し、
+// オプショナルフィールド (thumbnailUrl / projectId 等) が undefined のまま
+// addDoc/updateDoc に渡っても Firestore SDK が拒否しないようにする
+// （X URL の OG メタに image が無い等のケースで undefined になる）
+export const db = initializeFirestore(app, {
+  ignoreUndefinedProperties: true,
+});
 
 if (useEmulator) {
   // ブラウザは Docker network の外なので、ホスト側マッピング（+200 シフト済）を使う
