@@ -1,0 +1,480 @@
+/* ============================================================
+   追加スタイル — 認証画面、共通UI、トップバー、エラー境界
+   （プロトタイプ styles.css に存在しない要素のため追加）
+   ============================================================ */
+
+/* ----- Auth screens ----- */
+.auth-shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  background: var(--bg);
+  padding: 40px 20px;
+}
+.auth-card {
+  width: 100%;
+  max-width: 420px;
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: 28px 28px 24px;
+  box-shadow: 0 16px 40px -20px oklch(0.22 0.01 60 / 0.18);
+}
+.auth-brand { margin-bottom: 18px; }
+.brand-name {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.brand-tag {
+  font-size: 11px;
+  color: var(--ink-3);
+  margin-top: 2px;
+}
+.auth-title {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 600;
+  margin: 6px 0 22px;
+}
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.auth-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+.auth-field > span {
+  font-weight: 500;
+  color: var(--ink-2);
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.auth-field em {
+  font-style: normal;
+  color: var(--ink-4);
+  font-size: 11px;
+}
+.auth-field input {
+  font-size: 14px;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+  color: var(--ink);
+  transition: border-color 0.1s;
+}
+.auth-field input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.auth-radio-row {
+  border: none;
+  padding: 0;
+  margin: 0;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.auth-radio-row legend {
+  font-weight: 500;
+  margin-bottom: 6px;
+  color: var(--ink-2);
+}
+.radio {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--ink);
+  cursor: pointer;
+}
+.radio input { accent-color: var(--accent); }
+.auth-error {
+  font-size: 13px;
+  color: oklch(0.45 0.18 25);
+  background: oklch(0.97 0.04 25);
+  border: 1px solid oklch(0.85 0.06 25);
+  padding: 10px 12px;
+  border-radius: var(--radius);
+}
+.auth-done {
+  font-size: 13px;
+  color: var(--ink-2);
+  padding: 12px;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  margin-bottom: 16px;
+}
+.auth-foot {
+  margin-top: 18px;
+  font-size: 12px;
+  color: var(--ink-3);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.auth-foot a {
+  color: var(--accent-ink);
+  text-decoration: none;
+}
+.auth-foot a:hover { text-decoration: underline; }
+.auth-foot .dot { color: var(--ink-4); }
+
+/* ----- Generic buttons ----- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--ink);
+  cursor: pointer;
+  transition: background 0.1s, border-color 0.1s;
+}
+.btn:hover {
+  background: var(--bg-2);
+  border-color: var(--ink-4);
+}
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.btn-primary {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--bg);
+}
+.btn-primary:hover {
+  background: oklch(0.32 0.01 60);
+  border-color: oklch(0.32 0.01 60);
+}
+.btn-destructive {
+  background: oklch(0.45 0.18 25);
+  border-color: oklch(0.45 0.18 25);
+  color: var(--bg);
+}
+.btn-destructive:hover {
+  background: oklch(0.40 0.20 25);
+  border-color: oklch(0.40 0.20 25);
+}
+.btn-ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--ink-2);
+  padding: 6px 10px;
+}
+.btn-ghost:hover {
+  background: var(--bg-2);
+  color: var(--ink);
+}
+
+/* ----- Topbar ----- */
+.main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.topbar {
+  height: 52px;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.topbar-spacer { flex: 1; }
+.topbar-warn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: oklch(0.40 0.16 60);
+  background: oklch(0.96 0.06 65);
+  border: 1px solid oklch(0.85 0.07 65);
+  padding: 5px 10px;
+  border-radius: var(--radius);
+}
+.topbar-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.topbar-user-meta {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+  font-size: 12px;
+}
+.topbar-user-name { font-weight: 500; }
+.topbar-user-handle {
+  font-size: 11px;
+  color: var(--ink-3);
+}
+
+/* ----- Avatar (補強) ----- */
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0;
+  user-select: none;
+  flex-shrink: 0;
+}
+.avatar-sm { width: 28px; height: 28px; font-size: 11px; }
+.avatar-md { width: 40px; height: 40px; font-size: 13px; }
+.avatar-lg { width: 56px; height: 56px; font-size: 16px; }
+
+/* ----- Page wrapper ----- */
+.page {
+  flex: 1;
+  padding: 28px 32px 80px;
+  overflow-y: auto;
+  max-width: 1280px;
+  margin: 0 auto;
+  width: 100%;
+}
+.page-head {
+  margin-bottom: 24px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--line);
+}
+.page-title {
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  margin: 0 0 4px;
+}
+.page-subtitle {
+  font-size: 13px;
+  color: var(--ink-3);
+  margin: 0;
+}
+.page-section { margin-bottom: 28px; }
+
+/* ----- Empty state ----- */
+.empty-state {
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-lg);
+  padding: 48px 24px;
+  text-align: center;
+  background: var(--bg-2);
+}
+.empty-state-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink);
+  margin-bottom: 6px;
+}
+.empty-state-desc {
+  font-size: 12px;
+  color: var(--ink-3);
+  max-width: 360px;
+  margin: 0 auto;
+  line-height: 1.6;
+}
+.empty-state-action {
+  margin-top: 16px;
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+}
+
+/* ----- Spinner ----- */
+.spinner {
+  display: inline-block;
+  border: 2px solid var(--line);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spinner-spin 0.7s linear infinite;
+}
+.page-loading {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 14px;
+  color: var(--ink-3);
+  font-size: 12px;
+}
+@keyframes spinner-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ----- Visibility badge ----- */
+.visibility-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--bg-raised);
+  color: var(--ink-2);
+}
+.visibility-badge[data-visibility="shared"] {
+  border-color: oklch(0.85 0.08 150);
+  background: oklch(0.97 0.04 150);
+  color: oklch(0.40 0.10 150);
+}
+.visibility-badge[data-visibility="private"] {
+  border-color: var(--line);
+  background: var(--bg-2);
+  color: var(--ink-3);
+}
+.visibility-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.6;
+}
+
+/* ----- Modal（ConfirmDialog 用 / プロトタイプの.modalと衝突しないよう modal-confirm 限定の補正のみ） ----- */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: oklch(0.22 0.01 60 / 0.35);
+  display: grid;
+  place-items: center;
+  z-index: 50;
+  animation: modal-in 0.12s ease-out;
+}
+.modal-confirm {
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  width: 420px;
+  max-width: calc(100% - 32px);
+  box-shadow: 0 24px 60px -20px oklch(0.22 0.01 60 / 0.35);
+}
+.modal-header { padding: 18px 22px 6px; }
+.modal-title {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0;
+}
+.modal-body {
+  padding: 6px 22px 18px;
+  color: var(--ink-2);
+  font-size: 13px;
+  line-height: 1.65;
+}
+.modal-footer {
+  padding: 14px 22px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  background: var(--bg-2);
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+@keyframes modal-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* ----- Error fallback ----- */
+.error-fallback {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  background: var(--bg);
+  padding: 40px 20px;
+}
+.error-fallback-card {
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: 28px;
+  max-width: 480px;
+  text-align: center;
+}
+.error-fallback-card h1 {
+  font-family: var(--font-display);
+  font-size: 18px;
+  margin: 0 0 12px;
+}
+.error-fallback-message {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-3);
+  background: var(--bg-2);
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  margin: 0 0 16px;
+  word-break: break-all;
+  text-align: left;
+}
+.error-fallback-card .btn { margin: 0 4px; }
+
+/* ----- Sidebar nav 補強（プロトタイプは内部state/divベース、ここはNavLink/aタグ用） ----- */
+.sidebar-nav {
+  flex: 1;
+  padding: 12px 12px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  overflow-y: auto;
+}
+.nav-group {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.nav-group-label {
+  padding: 6px 10px 4px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ink-4);
+}
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  font-size: 13px;
+  color: var(--ink-2);
+  border-radius: var(--radius);
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+}
+.nav-item:hover {
+  background: var(--bg-2);
+  color: var(--ink);
+}
+.nav-item.is-active {
+  background: var(--bg-raised);
+  color: var(--ink);
+  border: 1px solid var(--line-2);
+  font-weight: 500;
+}
