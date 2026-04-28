@@ -88,8 +88,8 @@ export async function findRecent(count = 200): Promise<Feedback[]> {
 }
 
 /**
- * ステータス更新。一方向遷移をクライアント側でも防御的に検証してから書き込む。
- * Rules でも強制されるが、UI で逆遷移を試行できないよう投げる。
+ * ステータス更新。同状態は no-op（NO_CHANGE）として早期 return。
+ * 任意の status 間遷移を許容（逆遷移含む）。
  */
 export async function setStatus(
   id: string,
@@ -100,6 +100,7 @@ export async function setStatus(
     throw new Error('NO_CHANGE');
   }
   if (!reachableStatuses(current).includes(next)) {
+    // 念のため: 未知の status 値が渡ってきた場合だけ防御的に拒否
     throw new Error('INVALID_TRANSITION');
   }
   await updateDoc(doc(db, `${COL}/${id}`), {

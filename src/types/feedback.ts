@@ -16,16 +16,15 @@ export const FEEDBACK_STATUS_LABEL: Record<FeedbackStatus, string> = {
   resolved: '対応済み',
 };
 
-/** 一方向遷移：ある status から到達可能な次の status の集合 */
+/**
+ * ある status から到達可能な次の status の集合（自分以外の全 status）。
+ *
+ * MVP 当初は new → acknowledged → resolved の一方向のみだったが、
+ * 「確認済み・対応済みからでも新規に戻したい」という運用要望で双方向に変更。
+ * 状態変更はすべて admin_logs に記録されるので逆遷移も監査可能。
+ */
 export function reachableStatuses(current: FeedbackStatus): FeedbackStatus[] {
-  switch (current) {
-    case 'new':
-      return ['acknowledged', 'resolved'];
-    case 'acknowledged':
-      return ['resolved'];
-    case 'resolved':
-      return [];
-  }
+  return FEEDBACK_STATUSES.filter((s) => s !== current);
 }
 
 export interface Feedback {

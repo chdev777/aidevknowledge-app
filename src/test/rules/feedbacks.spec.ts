@@ -140,7 +140,7 @@ describe('feedbacks rules — update', () => {
     );
   });
 
-  it('管理者でも acknowledged → new の逆遷移は拒否', async () => {
+  it('管理者は acknowledged → new に戻せる（運用要望で逆遷移許容）', async () => {
     await seedUser(env, UIDS.alice, '管理者');
     await env.withSecurityRulesDisabled(async (ctx) => {
       await setDoc(
@@ -149,7 +149,7 @@ describe('feedbacks rules — update', () => {
       );
     });
     const db = authed(env, UIDS.alice).firestore();
-    await assertFails(
+    await assertSucceeds(
       updateDoc(doc(db, 'feedbacks/f1'), {
         status: 'new',
         updatedAt: serverTimestamp(),
@@ -157,7 +157,7 @@ describe('feedbacks rules — update', () => {
     );
   });
 
-  it('resolved からの更新は全て拒否', async () => {
+  it('管理者は resolved → acknowledged も可', async () => {
     await seedUser(env, UIDS.alice, '管理者');
     await env.withSecurityRulesDisabled(async (ctx) => {
       await setDoc(
@@ -166,15 +166,40 @@ describe('feedbacks rules — update', () => {
       );
     });
     const db = authed(env, UIDS.alice).firestore();
-    await assertFails(
+    await assertSucceeds(
       updateDoc(doc(db, 'feedbacks/f1'), {
         status: 'acknowledged',
         updatedAt: serverTimestamp(),
       }),
     );
-    await assertFails(
+  });
+
+  it('管理者は resolved → new も可', async () => {
+    await seedUser(env, UIDS.alice, '管理者');
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(
+        doc(ctx.firestore(), 'feedbacks/f1'),
+        baseFb(UIDS.bob, 'resolved'),
+      );
+    });
+    const db = authed(env, UIDS.alice).firestore();
+    await assertSucceeds(
       updateDoc(doc(db, 'feedbacks/f1'), {
         status: 'new',
+        updatedAt: serverTimestamp(),
+      }),
+    );
+  });
+
+  it('未知の status 値は拒否', async () => {
+    await seedUser(env, UIDS.alice, '管理者');
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'feedbacks/f1'), baseFb(UIDS.bob));
+    });
+    const db = authed(env, UIDS.alice).firestore();
+    await assertFails(
+      updateDoc(doc(db, 'feedbacks/f1'), {
+        status: 'invalid',
         updatedAt: serverTimestamp(),
       }),
     );

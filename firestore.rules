@@ -329,19 +329,15 @@ service cloud.firestore {
         && request.resource.data.message.size() <= 1000
         && request.resource.data.createdAt == request.time;
 
-      // 管理者のみ、status と updatedAt のみ更新可
+      // 管理者のみ、status と updatedAt のみ更新可。
+      // 任意の遷移を許容（逆遷移含む）。状態変更はすべて admin_logs に記録される。
       allow update: if isAdmin()
         && request.resource.data.createdBy == resource.data.createdBy
         && request.resource.data.message == resource.data.message
         && request.resource.data.category == resource.data.category
         && request.resource.data.diff(resource.data).affectedKeys()
             .hasOnly(['status', 'updatedAt'])
-        && (
-          (resource.data.status == 'new'
-            && request.resource.data.status in ['acknowledged', 'resolved'])
-          || (resource.data.status == 'acknowledged'
-            && request.resource.data.status == 'resolved')
-        );
+        && request.resource.data.status in ['new', 'acknowledged', 'resolved'];
 
       allow delete: if false;
     }
