@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useLocation, useNavigate, type Location } from 'react-router-dom';
 import { useAuth } from '../lib/firebase/auth-context.js';
 import { toAppError } from '../lib/utils/error.js';
@@ -17,9 +17,11 @@ export function LoginPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  if (status === 'authed') {
-    navigate('/', { replace: true });
-  }
+  useEffect(() => {
+    if (status === 'authed') {
+      navigate('/', { replace: true });
+    }
+  }, [status, navigate]);
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
