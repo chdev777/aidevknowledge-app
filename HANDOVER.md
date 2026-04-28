@@ -1,12 +1,87 @@
 # セッション引き継ぎノート
 
-> 最終更新: 2026-04-27（セッション 2 通し）
+> 最終更新: 2026-04-28（セッション 3 / 管理画面 本実装）
 > 引き継ぎ対象: AIアプリ開発ナレッジ共有ハブ MVP（PoC: ローカルDocker / 本番想定: Firebase Blaze）
-> 直近コミット: `355b0af feat(link): 情報ソース別のブランドロゴアイコンを link-thumb に表示`
+> 直近コミット: `355b0af feat(link): 情報ソース別のブランドロゴアイコンを link-thumb に表示`（コミット前、本セッション分は未コミット）
 
 ---
 
-## 今回やったこと
+## セッション 3（2026-04-28）：管理画面 `/admin` 本実装
+
+### 概要
+Phase 2 でプレースホルダのままだった `/admin` を本実装し、運用に必要な 3 機能（ユーザー管理 / タグマスタ / 投稿モデレーション）を投入。design-reference の `10-admin.png` に整合するタブ式 1 ページ構成。
+
+### 確定した要件
+- **スコープ**: ユーザー一覧 + ロール変更 / タグ CRUD / 投稿モデレーション（削除）
+- **ロール変更**: 管理者→他者を任意ロールに変更可（管理者昇格含む）。**最後の管理者は降格不可**（クライアント `countByRole()` でガード、Rules では検証しない）
+- **削除方式**: 物理削除 + `admin_logs` コレクションに監査ログを残す（不変）
+- **画面構成**: A. `/admin` 単一ページ + タブ切替（`?tab=users|tags|moderation` でディープリンク）
+- **招待機能はスコープ外**（Cloud Functions 必須 → Phase 3）
+
+### 実装内容
+1. **Firestore Rules（`firestore.rules`）**
+   - `isAdmin()` helper を追加（`get(/users/{uid}).data.role == '管理者'`）
+   - `users.update`: 本人 update に加え、管理者は他者の `role` を変更可（`handle` は不変、affectedKeys は `['role','updatedAt']` 限定）
+   - `tags.create / update / delete`: 管理者のみ。`name` 1-32 / `type` 6 種に制約
+   - `links / notes / apps / questions / answers / comments` の `delete`: `ownerOf || isAdmin()`
+   - **`admin_logs/{id}`**: read 管理者のみ / create 管理者のみ + `actorId == auth.uid` + action は 8 種許可リスト / update/delete 不可（不変ログ）
+   - `firestore.indexes.json` に `admin_logs (actorId asc, createdAt desc)` index 追加
+
+2. **DB レイヤ**
+   - `src/lib/db/users.ts` に `findAll(filter?)` / `setRole()` / `countByRole()` 追加
+   - `src/lib/db/tags.ts` に `create()` / `update()` / `remove()` 追加
+   - `src/lib/db/adminLogs.ts` 新規（`record()` / `findRecent()`）
+   - `src/lib/schemas/tag.ts` / `src/lib/schemas/admin-log.ts` / `src/types/admin-log.ts` 新規
+   - `src/lib/db/index.ts` に `adminLogsDb` を re-export
+
+3. **画面（`src/pages/admin/`）**
+   - `AdminPage.tsx` を全面書換（PageHeader + `me-tabs` 流用 + ?tab= 同期 + 管理者以外は警告表示）
+   - `tabs/UsersTab.tsx`：検索 + ロール chip + 行（avatar / name / handle / role セレクト）。自分の row は disabled、降格時の last-admin チェック
+   - `tabs/TagsTab.tsx`：type chip + 「新規タグ」インラインフォーム + 行ごとの編集/削除 + ConfirmDialog
+   - `tabs/ModerationTab.tsx`：種別 chip（link/qa/note/app）+ 既存 Row コンポーネントを再利用 + 「管理者削除」ボタン + 末尾に直近 admin_logs 10 件
+   - **共有中（shared）の投稿のみ表示**（private は管理者でも read 不可なので構造上モデレーション対象外）
+
+4. **Sidebar**
+   - 「設定」を「管理」に改名し、`profile?.role === '管理者'` のときのみ表示
+
+5. **CSS**
+   - `src/extra.css` に `.admin-section / .admin-toolbar / .admin-search / .admin-rows / .admin-row / .admin-row-form / .admin-input / .admin-role-select / .admin-mod-row / .admin-logs / .admin-row-self / .admin-row-title / .admin-row-meta` を追加（+100 行）
+
+6. **テスト（rules）**
+   - `helpers.ts` に `seedUser(env, uid, role)` を追加（admin/non-admin 区別をテストで使う）
+   - `users.spec.ts` に管理者ロール変更ケース 4 件追加
+   - `favorites-tags.spec.ts` の tags ケースを 7 件に拡張（admin write/update/delete + 一般拒否 + バリデーション）
+   - `admin-logs.spec.ts` を新規作成（7 件：read/create/actorId/action/不変性）
+   - `links.spec.ts` / `comments.spec.ts` に「管理者は他者の delete 可」ケース追加
+   - **計 60/60 グリーン**（前 41 → +19 ケース）
+
+7. **その他**
+   - `.env` / `.env.example` に `FIRESTORE_EMULATOR_HOST=firebase-emulator:8080` を追加（`pnpm test:rules` を Docker 内で env 指定なく実行可能に）
+
+### 検証結果
+- `pnpm lint` ✓（tsc --noEmit）
+- `pnpm test` ✓（unit 43/43）
+- `pnpm test:rules` ✓（rules 60/60）
+- `pnpm build` ✓（376 modules）
+
+### 設計判断（採らなかった選択肢）
+- **Sidebar サブナビゲーション + 別ルート（/admin/users 等）**: MVP 規模では過剰、design-reference からも離れる
+- **soft delete（hidden/deletedAt）**: MVP では物理削除 + 監査ログで十分。soft delete は復元 UI まで必要になり過剰
+- **Rules で「最後の管理者は降格不可」を強制**: ユーザー総数 count は Rules では取れず、`get()` を多用すると read コストが嵩む。クライアント `countByRole()` の UX チェックで MVP 十分
+- **private 投稿のモデレーション**: 管理者でも他者の private 投稿は read 不可（プライバシー優先）。`shared` のみモデレーション対象とする
+
+### コミット粒度（予定）
+1. `feat(rules): 管理者ロールと admin_logs / tags / モデレーション削除のルール追加`
+2. `feat(db): users.findAll/setRole, tags CRUD, adminLogs を追加`
+3. `feat(admin): タブ式 /admin に書換 + UsersTab / TagsTab / ModerationTab を追加`
+4. `feat(shell): Sidebar の「管理」を管理者のみ表示`
+5. `test(rules): 管理者ロール / tags / admin_logs / モデレーション削除のテスト追加`
+6. `chore(env): FIRESTORE_EMULATOR_HOST を .env に追加（rules テスト用）`
+7. `docs(handover): 管理画面実装の差分を反映`
+
+---
+
+## セッション 2（2026-04-27）：MVP + Phase 2 完了
 
 ### 1. MVP 実機検証 + 不具合の一掃
 HANDOVER 前版で「未着手」だった検証項目を全消化：
@@ -174,11 +249,12 @@ Spark 制約下では Functions 不可。MVP では「クライアント `increm
 - ✅ Tweaks パネル（テーマ/アクセント/密度）動作
 
 ### まだ手をつけていない作業
-- **E2E テスト**: 主要フロー（サインアップ → 投稿 → コメント → 採用 → お気に入り → 公開切替）を Playwright で網羅。`tools/scripts/verify-list-pages.mjs` のような one-off は存在
+- **E2E テスト**: 主要フロー（サインアップ → 投稿 → コメント → 採用 → お気に入り → 公開切替 → 管理者操作）を Playwright で網羅。`tools/scripts/verify-list-pages.mjs` のような one-off は存在
 - **本番 Blaze 移行**: `docs/runbooks/deploy.md` の 10 ステップ未実行
-- **Cloud Functions**: 集計（answerCount/stats/タグ件数）+ OG 取得 + 課金停止 + blocking trigger
-- **管理画面の中身**: ユーザー一覧 / ロール変更 / タグマスタ管理 / 投稿モデレーション
+- **Cloud Functions**: 集計（answerCount/stats/タグ件数）+ OG 取得 + 課金停止 + blocking trigger + 招待フロー
 - **マイページのお気に入りタブ・下書きタブ**: タブ枠は実装済、中身（タブ切替時の表示）は disabled
+- **管理画面の手動 E2E**: 機能本実装は済（セッション 3）。ブラウザでの実機確認はまだ → 次回ログイン時に検証
+- **管理画面の拡張候補**: 招待（メール）/ 監査ログ専用ページ / private 投稿のモデレーション（要 Rules 拡張） / 「最後の管理者降格不可」を Rules で強制（現状はクライアント UX チェックのみ）
 
 ### 既知の留意点
 - **Vite HMR**: `usePolling: true, interval: 5000ms`。500ms に下げると CPU 飽和+ HTML 応答秒単位遅延
@@ -187,6 +263,8 @@ Spark 制約下では Functions 不可。MVP では「クライアント `increm
 - **コミットメッセージは日本語**（type prefix のみ英語）
 - **本番 CSP**: `img-src` は限定的（GitHub OG 画像 `opengraph.githubassets.com` 等は本番で表示されない）。デプロイ時に `firebase.json` の CSP 拡張要検討
 - **og-proxy の Twitter oEmbed**: 公開ツイート/プロフィールのみ動作。削除/非公開ツイートは空応答 → ユーザーに通知される
+- **rules テスト用 env**: `FIRESTORE_EMULATOR_HOST=firebase-emulator:8080` を `.env` に追加済。`docker compose up -d --force-recreate app` で env を反映する必要があるケースあり
+- **モデレーション対象は shared 投稿のみ**: 管理者でも他者の private 投稿は read 不可（Rules で制限）。private のモデレーションは Phase 3 で要件次第
 
 ### テストアカウント
 詳細は [docs/runbooks/test-accounts.md](docs/runbooks/test-accounts.md)。
