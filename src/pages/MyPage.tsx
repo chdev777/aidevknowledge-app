@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import {
   appsDb,
   commentsDb,
+  favoritesDb,
   linksDb,
   notesDb,
   questionsDb,
@@ -15,6 +16,8 @@ import { EmptyState } from '../components/shared/EmptyState.js';
 import { Icon, type IconName } from '../components/shared/Icon.js';
 import { SourceIcon } from '../components/shared/SourceIcon.js';
 import { CommentTypeBadge } from '../components/comments/CommentTypeBadge.js';
+import { MyFavorites } from '../components/me/MyFavorites.js';
+import { MyDrafts } from '../components/me/MyDrafts.js';
 import { timeAgo } from '../lib/utils/time.js';
 import type { Visibility } from '../types/visibility.js';
 import type { Link as LinkDoc } from '../types/link.js';
@@ -66,6 +69,11 @@ export function MyPage() {
     queryFn: () => (uid ? commentsDb.findByOwner(uid) : Promise.resolve([])),
     enabled: !!uid,
   });
+  const favsCountQ = useQuery({
+    queryKey: ['favorites', uid, 'count'],
+    queryFn: () => (uid ? favoritesDb.listByOwner(uid).then((r) => r.length) : Promise.resolve(0)),
+    enabled: !!uid,
+  });
 
   const counts = useMemo(() => {
     const tally = <T extends { visibility: Visibility }>(arr: T[] | undefined) => {
@@ -85,14 +93,16 @@ export function MyPage() {
   const unanswered = (questionsQ.data ?? []).filter((q) => q.answerCount === 0).length;
   const answered = (counts.questions.total ?? 0) - unanswered;
 
+  const draftCount = countLocalDrafts();
+
   const tabs: TabDef[] = [
     { id: 'links', label: '自分のURL', icon: 'link', count: counts.links.total },
     { id: 'questions', label: '自分の質問', icon: 'qa', count: counts.questions.total },
     { id: 'notes', label: '自分の検証メモ', icon: 'note', count: counts.notes.total },
     { id: 'apps', label: '自分の作成アプリ', icon: 'app', count: counts.apps.total },
     { id: 'comments', label: 'コメント履歴', icon: 'message', count: counts.comments.total },
-    { id: 'favorites', label: 'お気に入り', icon: 'star', disabled: true },
-    { id: 'drafts', label: '下書き', icon: 'note', disabled: true },
+    { id: 'favorites', label: 'お気に入り', icon: 'star', count: favsCountQ.data ?? 0 },
+    { id: 'drafts', label: '下書き', icon: 'note', count: draftCount },
   ];
 
   const visMatch = (v: Visibility) =>
@@ -258,11 +268,24 @@ export function MyPage() {
 
       {tab === 'comments' && <CommentHistory items={commentsQ.data ?? []} isPending={commentsQ.isPending} />}
 
-      {(tab === 'favorites' || tab === 'drafts') && (
-        <EmptyState title="今後実装予定" description="Phase 2 で公開予定の機能です。" />
-      )}
+      {tab === 'favorites' && <MyFavorites uid={uid} />}
+
+      {tab === 'drafts' && <MyDrafts />}
     </div>
   );
+}
+
+function countLocalDrafts(): number {
+  let n = 0;
+  for (const kind of ['link', 'question', 'note', 'app']) {
+    try {
+      const raw = localStorage.getItem(`aidev:draft:${kind}`);
+      if (raw && raw.length > 2) n += 1; // 空 JSON 「{}」は数えない
+    } catch {
+      /* ignore */
+    }
+  }
+  return n;
 }
 
 function Stat({
