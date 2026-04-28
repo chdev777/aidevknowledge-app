@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { collection, getCountFromServer, query, where } from 'firebase/firestore';
@@ -5,6 +6,9 @@ import { db } from '../../lib/firebase/client.js';
 import { useAuth } from '../../lib/firebase/auth-context.js';
 import { Icon, type IconName } from '../shared/Icon.js';
 import { Avatar } from './Avatar.js';
+import { CHANGELOG } from '../../lib/data/changelog.js';
+import { filterChangelog, unreadCount } from '../../lib/utils/changelog.js';
+import { getLastSeen } from '../../lib/utils/announcements-storage.js';
 
 interface NavDef {
   to: string;
@@ -48,6 +52,21 @@ export function Sidebar() {
     }),
     staleTime: 5 * 60_000,
   });
+
+  // お知らせ未読件数。route 切替時に再評価したいので location.pathname を依存に
+  const [announcementsUnread, setAnnouncementsUnread] = useState(0);
+  useEffect(() => {
+    const update = () => {
+      const isAdmin = profile?.role === '管理者';
+      const visible = filterChangelog(CHANGELOG, isAdmin);
+      setAnnouncementsUnread(unreadCount(visible, getLastSeen()));
+    };
+    update();
+    // /announcements 訪問後に lastSeen が更新される。 storage event 同タブでは飛ばないため、
+    // フォーカス復帰や route 変更で再評価する。簡易的に focus と pathname 変化に乗せる。
+    window.addEventListener('focus', update);
+    return () => window.removeEventListener('focus', update);
+  }, [profile?.role, profile?.id]);
 
   return (
     <aside className="sidebar">
@@ -103,6 +122,17 @@ export function Sidebar() {
 
       <div className="nav-section" style={{ paddingTop: 0 }}>
         <div className="nav-section-title">あなた</div>
+        <NavLink
+          to="/announcements"
+          className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+          onClick={() => setAnnouncementsUnread(0)}
+        >
+          <Icon name="message" size={14} style={{ flexShrink: 0 }} />
+          <span>お知らせ</span>
+          {announcementsUnread > 0 && (
+            <span className="nav-count">{announcementsUnread}</span>
+          )}
+        </NavLink>
         <NavLink
           to="/me"
           className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
