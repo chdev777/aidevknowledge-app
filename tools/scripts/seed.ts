@@ -31,7 +31,7 @@ interface SeedUser {
   color: string;
 }
 const USERS: SeedUser[] = [
-  { uid: 'u1', email: 'sato.k@example.ac.jp', password: 'testtest', name: '佐藤 健一', handle: 'sato.k', role: 'DX推進', color: '#b08968' },
+  { uid: 'u1', email: 'sato.k@example.ac.jp', password: 'testtest', name: '佐藤 健一', handle: 'sato.k', role: '管理者', color: '#b08968' },
   { uid: 'u2', email: 'matsuoka.m@example.ac.jp', password: 'testtest', name: '松岡 真理', handle: 'matsuoka.m', role: '情報支援', color: '#7a8b6f' },
   { uid: 'u3', email: 'kimura.r@example.ac.jp', password: 'testtest', name: '木村 亮介', handle: 'kimura.r', role: 'DX推進', color: '#6b7a99' },
 ];
