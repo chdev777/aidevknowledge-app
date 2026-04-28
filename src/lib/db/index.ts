@@ -9,3 +9,4 @@ export * as projectsDb from './projects.js';
 export * as tagsDb from './tags.js';
 export * as favoritesDb from './favorites.js';
 export * as adminLogsDb from './adminLogs.js';
+export * as feedbacksDb from './feedbacks.js';

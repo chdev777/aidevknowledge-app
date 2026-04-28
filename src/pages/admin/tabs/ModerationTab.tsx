@@ -293,6 +293,7 @@ const ACTION_LABEL: Record<AdminLogAction, string> = {
   create_tag: 'タグ作成',
   update_tag: 'タグ更新',
   delete_tag: 'タグ削除',
+  set_feedback_status: 'フィードバック状態変更',
 };
 
 function LogRow({ log }: { log: AdminLog }) {
