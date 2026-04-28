@@ -1530,3 +1530,116 @@ body[data-theme="dark"] .link-thumb[data-source="zenn"] {
   display: block;
 }
 
+/* ========================================
+   /admin（ユーザー / タグ / モデレーション）
+   ======================================== */
+.admin-section {
+  margin-top: 8px;
+}
+
+.admin-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 12px;
+}
+.admin-toolbar-note {
+  font-size: 11px;
+  color: var(--ink-3);
+  width: 100%;
+}
+
+.admin-search {
+  flex: 1;
+  min-width: 200px;
+  max-width: 320px;
+  padding: 6px 10px;
+  font-size: 13px;
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--ink);
+}
+.admin-search:focus {
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.admin-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border-top: 1px solid var(--line);
+}
+
+.admin-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 4px;
+  border-bottom: 1px solid var(--line);
+}
+.admin-row-form {
+  background: var(--bg-2);
+  padding: 10px;
+  border-radius: var(--radius);
+}
+
+.admin-row-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.admin-row-self {
+  font-size: 10px;
+  color: var(--accent-ink);
+  background: var(--accent-soft);
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid oklch(0.85 0.10 65);
+  font-family: var(--font-mono);
+}
+.admin-row-meta {
+  display: flex;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+}
+
+.admin-role-select,
+.admin-input {
+  padding: 6px 10px;
+  font-size: 13px;
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--ink);
+}
+.admin-input {
+  flex: 1;
+  min-width: 160px;
+}
+.admin-role-select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.admin-mod-row {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  border-bottom: 1px solid var(--line);
+  padding: 4px 0;
+}
+
+.admin-logs {
+  margin-top: 28px;
+}
+
