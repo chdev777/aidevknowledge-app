@@ -5,8 +5,9 @@ import { Icon, type IconName } from '../../components/shared/Icon.js';
 import { UsersTab } from './tabs/UsersTab.js';
 import { TagsTab } from './tabs/TagsTab.js';
 import { ModerationTab } from './tabs/ModerationTab.js';
+import { LogsTab } from './tabs/LogsTab.js';
 
-type TabId = 'users' | 'tags' | 'moderation';
+type TabId = 'users' | 'tags' | 'moderation' | 'logs';
 
 interface TabDef {
   id: TabId;
@@ -18,10 +19,11 @@ const TABS: TabDef[] = [
   { id: 'users', label: 'ユーザー', icon: 'user' },
   { id: 'tags', label: 'タグ', icon: 'tag' },
   { id: 'moderation', label: 'モデレーション', icon: 'admin' },
+  { id: 'logs', label: '監査ログ', icon: 'note' },
 ];
 
 function isTabId(v: string | null): v is TabId {
-  return v === 'users' || v === 'tags' || v === 'moderation';
+  return v === 'users' || v === 'tags' || v === 'moderation' || v === 'logs';
 }
 
 export function AdminPage() {
@@ -85,6 +87,7 @@ export function AdminPage() {
       {tab === 'users' && <UsersTab />}
       {tab === 'tags' && <TagsTab />}
       {tab === 'moderation' && <ModerationTab />}
+      {tab === 'logs' && <LogsTab />}
     </div>
   );
 }
