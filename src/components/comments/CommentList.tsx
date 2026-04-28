@@ -1,6 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { commentsDb } from '../../lib/db/index.js';
+import { useAuth } from '../../lib/firebase/auth-context.js';
 import type { CommentTargetType } from '../../types/comment.js';
+import type { Visibility } from '../../types/visibility.js';
 import { Spinner } from '../shared/Spinner.js';
 import { EmptyState } from '../shared/EmptyState.js';
 import { CommentTypeBadge } from './CommentTypeBadge.js';
@@ -9,12 +11,19 @@ import { Markdown } from '../shared/Markdown.js';
 interface Props {
   targetType: CommentTargetType;
   targetId: string;
+  /** 親docの visibility（クエリのフィルタを Rules 互換にするため必須） */
+  parentVisibility: Visibility;
 }
 
-export function CommentList({ targetType, targetId }: Props) {
+export function CommentList({ targetType, targetId, parentVisibility }: Props) {
+  const { fbUser } = useAuth();
+  const uid = fbUser?.uid;
+  const mode: 'shared' | 'mine' = parentVisibility === 'shared' ? 'shared' : 'mine';
   const q = useQuery({
-    queryKey: ['comments', targetType, targetId],
-    queryFn: () => commentsDb.findByTarget(targetType, targetId, { count: 50 }),
+    queryKey: ['comments', targetType, targetId, mode, uid ?? null],
+    queryFn: () =>
+      commentsDb.findByTarget(targetType, targetId, { count: 50, mode, uid }),
+    enabled: mode === 'shared' || !!uid,
   });
 
   if (q.isPending) return <div className="section-loading"><Spinner /></div>;

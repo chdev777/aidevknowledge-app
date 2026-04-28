@@ -132,7 +132,7 @@ export function LinkDetailPage() {
               targetId={l.id}
               targetVisibility={l.visibility}
             />
-            <CommentList targetType="link" targetId={l.id} />
+            <CommentList targetType="link" targetId={l.id} parentVisibility={l.visibility} />
           </div>
         </div>
 

@@ -147,7 +147,7 @@ export function AppDetailPage() {
             targetId={a.id}
             targetVisibility={a.visibility}
           />
-          <CommentList targetType="app" targetId={a.id} />
+          <CommentList targetType="app" targetId={a.id} parentVisibility={a.visibility} />
         </div>
 
         <aside className="detail-aside">

@@ -82,7 +82,7 @@ export function NoteDetailPage() {
               targetId={n.id}
               targetVisibility={n.visibility}
             />
-            <CommentList targetType="note" targetId={n.id} />
+            <CommentList targetType="note" targetId={n.id} parentVisibility={n.visibility} />
           </div>
         </div>
 
