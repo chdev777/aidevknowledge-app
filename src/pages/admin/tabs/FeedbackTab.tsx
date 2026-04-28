@@ -153,6 +153,13 @@ function FeedbackRow({
   pending: boolean;
 }) {
   const reachable = reachableStatuses(fb.status);
+  // 3 状態（新規 / 確認済み / 対応済み）すべて表示。現在の状態 + 一方向遷移先のみ
+  // 選択可能とし、逆遷移は <option disabled> で UI レベルで防ぐ。
+  const canPick = (s: FeedbackStatus) => s === fb.status || reachable.includes(s);
+  const handleChange = (next: FeedbackStatus) => {
+    if (next === fb.status) return; // 同じ状態は no-op
+    onChangeStatus(next);
+  };
   return (
     <div className="admin-row admin-row-feedback">
       <div style={{ minWidth: 0, flex: 1 }}>
@@ -175,15 +182,12 @@ function FeedbackRow({
       <select
         className="admin-role-select"
         value={fb.status}
-        disabled={pending || reachable.length === 0}
-        onChange={(e) => onChangeStatus(e.target.value as FeedbackStatus)}
+        disabled={pending}
+        onChange={(e) => handleChange(e.target.value as FeedbackStatus)}
       >
-        <option value={fb.status} disabled>
-          {FEEDBACK_STATUS_LABEL[fb.status]}
-        </option>
-        {reachable.map((s) => (
-          <option key={s} value={s}>
-            → {FEEDBACK_STATUS_LABEL[s]}
+        {FEEDBACK_STATUSES.map((s) => (
+          <option key={s} value={s} disabled={!canPick(s)}>
+            {FEEDBACK_STATUS_LABEL[s]}
           </option>
         ))}
       </select>
