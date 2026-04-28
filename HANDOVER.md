@@ -1,8 +1,77 @@
 # セッション引き継ぎノート
 
-> 最終更新: 2026-04-28（セッション 4 / 高優先度 + 中優先度タスク消化）
+> 最終更新: 2026-04-28（セッション 5 / お知らせ + フィードバック機能）
 > 引き継ぎ対象: AIアプリ開発ナレッジ共有ハブ MVP（PoC: ローカルDocker / 本番想定: Firebase Blaze）
-> 直近コミット: `9de871b chore(verify): 管理画面の Playwright E2E 検証スクリプトを追加`（本セッション分は未コミット）
+> ブランチ: `feat/announcements-feedback`（本セッション分は未コミット）
+
+---
+
+## セッション 5（2026-04-28 さらに後半）：お知らせ + フィードバック機能
+
+### 概要
+ユーザー ↔ 運営の双方向コミュニケーションを担保する 2 機能を、別プロジェクト発の仕様書（`changelog-notification.md` / `feedback.md`）を本プロジェクトに移植する形で追加。
+
+### 確定した要件
+- **お知らせデータ**: `src/lib/data/changelog.ts` 静的オブジェクト（バンドル同梱、バックエンド通信ゼロ）
+- **FAB 配置**: 右下スタック（Tweaks の上、`bottom: 64px`）
+- **お知らせ表示**: Topbar 直下バナー + Sidebar「お知らせ」リンク + 未読バッジ + `/announcements` ページ
+- **未読バッジ**: lastSeen 以降のリリース数を表示
+- **フィードバック ステータス**: `new` → `acknowledged` → `resolved`（一方向、Rules で逆遷移禁止）
+- **直接返信**: スコープ外。フィードバックループは「changelog の `fromFeedback: true` バナー」で間接的に閉じる
+
+### 実装内容
+
+#### Part A: お知らせ
+1. **静的データ**: `src/lib/data/changelog.ts`（v0.4.0 を 1 件初期投入）+ `Release` / `Entry` 型
+2. **純粋関数**: `src/lib/utils/changelog.ts` に `filterChangelog` / `getUnreadRelease` / `unreadCount` / `recordDismiss` / `markAsRead` / `hasFromFeedback` / `entryIcon` / `formatReleaseDate`
+3. **localStorage**: `src/lib/utils/announcements-storage.ts`（キー: `aidev:announcements:lastSeen` / `aidev:announcements:dismissCount`、防御的 try/catch）
+4. **AnnouncementsBanner**: `src/components/shell/AnnouncementsBanner.tsx`。Topbar と Outlet の間に配置。`role="alert"`、× 3 回で完全既読、「詳しく見る」で `/announcements` へ
+5. **AnnouncementsPage**: `src/pages/AnnouncementsPage.tsx`。リリースを時系列降順、type 別アイコン、`fromFeedback` / `audience='admin'` バッジ
+6. **Sidebar**: 「あなた」セクションに「お知らせ」リンク追加 + 未読バッジ
+7. **App.tsx**: `/announcements` ルート追加
+8. **テスト**: `src/test/unit/changelog.spec.ts`（19 ケース、純粋関数の境界条件）
+
+#### Part B: フィードバック
+1. **型 + Zod**: `src/types/feedback.ts`（カテゴリ 3 / ステータス 3 / `reachableStatuses()` ヘルパ）+ `src/lib/schemas/feedback.ts`
+2. **DB 層**: `src/lib/db/feedbacks.ts`（`create` / `findRecent` / `setStatus`、一方向遷移をクライアントでも検証）
+3. **Rules**: `feedbacks` コレクション。create は本人 + status='new' 強制 + 1000 字制限、update は管理者のみ + 一方向遷移を Rules で強制 + message 改ざん拒否 + affectedKeys=['status','updatedAt'] 限定、delete 全員不可
+4. **Indexes**: `(status, createdAt DESC)` と `(category, createdAt DESC)` 追加
+5. **FAB**: `src/components/feedback/FeedbackFab.tsx`。右下 `bottom:64px / z:92`、ESC/外側/× で閉じる、closed↔editing→sending→sent(2.5s 自動 close)/error
+6. **FeedbackTab**: `src/pages/admin/tabs/FeedbackTab.tsx`。サマリ + カテゴリ/ステータス chip + 行（カテゴリ・日時・投稿者 snap・本文・送信元）+ ステータス select は `reachableStatuses` で次の状態のみ表示 + `set_feedback_status` を adminLogs に記録
+7. **AdminPage**: 5 つ目のタブ「フィードバック」追加（既存 4 → 5）
+8. **admin_logs 拡張**: schema の `ADMIN_LOG_ACTIONS` と Rules の許可リストに `'set_feedback_status'` 追加
+9. **テスト**: `src/test/rules/feedbacks.spec.ts`（15 ケース、create / read / update / delete を網羅）
+
+### 検証結果（27 ケース中 24/24 PASS、unit / rules はそれぞれ全件 PASS）
+
+`tools/scripts/verify-announcements-feedback.mjs`（24/24 PASS）:
+- バナー初表示 / role="alert" / × 1 回 / リロード再表示 / 詳しく見る → /announcements
+- × 3 回で完全既読 / Sidebar 未読バッジ / お知らせ既読リセットでバッジ復活
+- FAB が Tweaks の上に配置 / フィードバック送信 → 成功表示 → 2.5s 自動 close
+- /admin?tab=feedback で送信したフィードバック表示 / new → acknowledged 成功
+- 監査ログに set_feedback_status 記録
+
+自動テスト:
+- `pnpm lint` ✓
+- `pnpm test` ✓ 62/62（前 43 → +19 changelog ケース）
+- `pnpm test:rules` ✓ 75/75（前 60 → +15 feedbacks ケース）
+- `pnpm build` ✓ 390 modules
+
+### 既存パターン拡張
+- AdminPage のタブ駆動を 4 → 5 に拡張（`isTabId` ガードも更新）
+- admin_logs の `ADMIN_LOG_ACTIONS` を 8 → 9 に拡張（`set_feedback_status`）
+  - LogsTab / ModerationTab の ACTION_LABEL も同期
+
+### コミット粒度（予定）
+1. `feat(announcements): 静的 changelog データ + 純粋関数 + 単体テスト`
+2. `feat(announcements): Topbar バナー + /announcements ページ + Sidebar 未読バッジ`
+3. `feat(rules): feedbacks コレクションのルールと一方向遷移強制`
+4. `feat(db): feedbacks の DB 層と Zod スキーマと型`
+5. `feat(feedback): 右下スタック FAB（投稿パネル）`
+6. `feat(admin): フィードバック管理タブ（5 つ目）+ 監査ログ統合`
+7. `test(rules): feedbacks Rules テスト 15 ケース`
+8. `chore(verify): お知らせ・フィードバックの Playwright E2E スクリプト`
+9. `docs(handover): セッション 5 の差分を反映`
 
 ---
 
