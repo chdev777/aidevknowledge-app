@@ -110,13 +110,15 @@ export function Sidebar() {
           <Icon name="user" size={14} style={{ flexShrink: 0 }} />
           <span>マイページ</span>
         </NavLink>
-        <NavLink
-          to="/admin"
-          className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-        >
-          <Icon name="admin" size={14} style={{ flexShrink: 0 }} />
-          <span>設定</span>
-        </NavLink>
+        {profile?.role === '管理者' && (
+          <NavLink
+            to="/admin"
+            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+          >
+            <Icon name="admin" size={14} style={{ flexShrink: 0 }} />
+            <span>管理</span>
+          </NavLink>
+        )}
       </div>
 
       {profile && (
