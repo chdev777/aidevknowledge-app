@@ -12,7 +12,7 @@ import {
   deleteDoc,
   serverTimestamp,
 } from 'firebase/firestore';
-import { authed, makeEnv, unauthed, UIDS } from './helpers.js';
+import { authed, makeEnv, seedUser, unauthed, UIDS } from './helpers.js';
 
 let env: RulesTestEnvironment;
 
@@ -138,5 +138,23 @@ describe('links rules', () => {
       tags: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11'],
     };
     await assertFails(setDoc(doc(db, 'links/l1'), tooMany));
+  });
+
+  it('管理者は他者の link を delete できる', async () => {
+    await seedUser(env, UIDS.bob, '管理者');
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'links/l1'), baseLink(UIDS.alice));
+    });
+    const db = authed(env, UIDS.bob).firestore();
+    await assertSucceeds(deleteDoc(doc(db, 'links/l1')));
+  });
+
+  it('一般ユーザーは他者の link を delete できない', async () => {
+    await seedUser(env, UIDS.bob, 'DX推進');
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'links/l1'), baseLink(UIDS.alice));
+    });
+    const db = authed(env, UIDS.bob).firestore();
+    await assertFails(deleteDoc(doc(db, 'links/l1')));
   });
 });

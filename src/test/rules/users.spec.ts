@@ -5,7 +5,7 @@ import {
   type RulesTestEnvironment,
 } from '@firebase/rules-unit-testing';
 import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { authed, makeEnv, UIDS } from './helpers.js';
+import { authed, makeEnv, seedUser, UIDS } from './helpers.js';
 
 let env: RulesTestEnvironment;
 
@@ -66,6 +66,54 @@ describe('users rules', () => {
     const bobDb = authed(env, UIDS.bob).firestore();
     await assertSucceeds(getDoc(doc(aliceDb, `users/${UIDS.alice}/private/profile`)));
     await assertFails(getDoc(doc(bobDb, `users/${UIDS.alice}/private/profile`)));
+  });
+
+  it('管理者は他者の role を変更できる', async () => {
+    await seedUser(env, UIDS.alice, '管理者');
+    await seedUser(env, UIDS.bob, 'DX推進');
+    const db = authed(env, UIDS.alice).firestore();
+    await assertSucceeds(
+      updateDoc(doc(db, `users/${UIDS.bob}`), {
+        role: '情報支援',
+        updatedAt: serverTimestamp(),
+      }),
+    );
+  });
+
+  it('管理者は他者を管理者に昇格できる', async () => {
+    await seedUser(env, UIDS.alice, '管理者');
+    await seedUser(env, UIDS.bob, 'DX推進');
+    const db = authed(env, UIDS.alice).firestore();
+    await assertSucceeds(
+      updateDoc(doc(db, `users/${UIDS.bob}`), {
+        role: '管理者',
+        updatedAt: serverTimestamp(),
+      }),
+    );
+  });
+
+  it('管理者でも他者の handle 変更は拒否', async () => {
+    await seedUser(env, UIDS.alice, '管理者');
+    await seedUser(env, UIDS.bob, 'DX推進');
+    const db = authed(env, UIDS.alice).firestore();
+    await assertFails(
+      updateDoc(doc(db, `users/${UIDS.bob}`), {
+        handle: 'evil',
+        updatedAt: serverTimestamp(),
+      }),
+    );
+  });
+
+  it('一般ユーザーは他者の role を変更できない', async () => {
+    await seedUser(env, UIDS.alice, 'DX推進');
+    await seedUser(env, UIDS.bob, 'DX推進');
+    const db = authed(env, UIDS.alice).firestore();
+    await assertFails(
+      updateDoc(doc(db, `users/${UIDS.bob}`), {
+        role: '管理者',
+        updatedAt: serverTimestamp(),
+      }),
+    );
   });
 });
 

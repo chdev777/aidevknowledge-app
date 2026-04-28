@@ -42,6 +42,13 @@ service cloud.firestore {
       return d[field] is string && d[field].size() > 0 && d[field].size() <= max;
     }
 
+    /** 呼出元が管理者ロールかどうか（users/{uid}.role を get で確認） */
+    function isAdmin() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == '管理者';
+    }
+
     // ========================================
     // users — public profile
     // ========================================
@@ -57,12 +64,22 @@ service cloud.firestore {
         && request.resource.data.handle.size() <= 32
         && request.resource.data.handle.matches('^[a-zA-Z0-9_.-]+$');
 
-      allow update: if signedIn()
-        && request.auth.uid == uid
-        // role 改ざん禁止（昇格防止）
-        && request.resource.data.role == resource.data.role
-        // handle 変更禁止（ユニーク制約維持）
-        && request.resource.data.handle == resource.data.handle;
+      // 本人による update（role/handle は不変）
+      // または 管理者による他者の role 変更（handle・他フィールドは触れない）
+      allow update: if signedIn() && (
+        (
+          request.auth.uid == uid
+          && request.resource.data.role == resource.data.role
+          && request.resource.data.handle == resource.data.handle
+        ) || (
+          isAdmin()
+          && request.auth.uid != uid
+          && request.resource.data.handle == resource.data.handle
+          && request.resource.data.role in ['DX推進', '情報支援', '管理者']
+          && request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['role', 'updatedAt'])
+        )
+      );
 
       allow delete: if false;
 
@@ -102,7 +119,7 @@ service cloud.firestore {
         && immutableOnUpdate(resource.data, request.resource.data)
         && request.resource.data.tags is list
         && request.resource.data.tags.size() <= 10;
-      allow delete: if ownerOf(resource.data);
+      allow delete: if ownerOf(resource.data) || isAdmin();
     }
 
     match /notes/{id} {
@@ -119,7 +136,7 @@ service cloud.firestore {
         && request.resource.data.conclusion.size() <= 2000;
       allow update: if ownerOf(resource.data)
         && immutableOnUpdate(resource.data, request.resource.data);
-      allow delete: if ownerOf(resource.data);
+      allow delete: if ownerOf(resource.data) || isAdmin();
     }
 
     match /apps/{id} {
@@ -139,7 +156,7 @@ service cloud.firestore {
         && request.resource.data.stats.likes == 0;
       allow update: if ownerOf(resource.data)
         && immutableOnUpdate(resource.data, request.resource.data);
-      allow delete: if ownerOf(resource.data);
+      allow delete: if ownerOf(resource.data) || isAdmin();
     }
 
     // ========================================
@@ -156,7 +173,7 @@ service cloud.firestore {
       // 質問本人だけが本文編集可能
       allow update: if ownerOf(resource.data)
         && immutableOnUpdate(resource.data, request.resource.data);
-      allow delete: if ownerOf(resource.data);
+      allow delete: if ownerOf(resource.data) || isAdmin();
 
       // 回答（サブコレクション）
       match /answers/{aid} {
@@ -198,7 +215,7 @@ service cloud.firestore {
           )
         );
 
-        allow delete: if ownerOf(resource.data);
+        allow delete: if ownerOf(resource.data) || isAdmin();
       }
     }
 
@@ -233,20 +250,57 @@ service cloud.firestore {
         && request.resource.data.targetType == resource.data.targetType
         && request.resource.data.targetId == resource.data.targetId;
 
-      allow delete: if ownerOf(resource.data);
+      allow delete: if ownerOf(resource.data) || isAdmin();
     }
 
     // ========================================
-    // tags / projects — read のみ（書込は admin SDK）
+    // tags — マスタ。read 全認証ユーザー / write 管理者のみ
     // ========================================
     match /tags/{id} {
       allow read: if signedIn();
-      allow write: if false;
+
+      allow create: if isAdmin()
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.size() <= 32
+        && request.resource.data.type in [
+          '技術', 'ツール', '開発', '用途', 'セキュリティ', '状態'
+        ];
+
+      allow update: if isAdmin()
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.size() <= 32
+        && request.resource.data.type in [
+          '技術', 'ツール', '開発', '用途', 'セキュリティ', '状態'
+        ];
+
+      allow delete: if isAdmin();
     }
 
     match /projects/{id} {
       allow read: if signedIn();
       allow write: if false;
+    }
+
+    // ========================================
+    // admin_logs — 監査ログ（管理者のみ read/create、不変）
+    // ========================================
+    match /admin_logs/{id} {
+      allow read: if isAdmin();
+
+      allow create: if isAdmin()
+        && request.resource.data.actorId == request.auth.uid
+        && request.resource.data.action in [
+          'set_role',
+          'delete_link', 'delete_qa', 'delete_note', 'delete_app',
+          'create_tag', 'update_tag', 'delete_tag'
+        ]
+        && request.resource.data.targetType is string
+        && request.resource.data.targetId is string
+        && request.resource.data.createdAt == request.time;
+
+      allow update, delete: if false;
     }
 
     // ========================================

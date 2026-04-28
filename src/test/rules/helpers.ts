@@ -5,7 +5,7 @@ import {
 } from '@firebase/rules-unit-testing';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { setLogLevel } from 'firebase/firestore';
+import { doc, setDoc, setLogLevel } from 'firebase/firestore';
 
 setLogLevel('error');
 
@@ -49,3 +49,19 @@ export function unauthed(env: RulesTestEnvironment): RulesTestContext {
 }
 
 export const FIXED_TIMESTAMP = new Date('2026-04-27T00:00:00Z');
+
+/** ルールをバイパスして users/{uid} を作成（admin/non-admin 区別をテストで使う） */
+export async function seedUser(
+  env: RulesTestEnvironment,
+  uid: string,
+  role: 'DX推進' | '情報支援' | '管理者' = 'DX推進',
+): Promise<void> {
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), `users/${uid}`), {
+      name: uid,
+      handle: uid,
+      role,
+      color: '#6b7a99',
+    });
+  });
+}

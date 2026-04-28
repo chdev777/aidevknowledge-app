@@ -4,8 +4,8 @@ import {
   assertSucceeds,
   type RulesTestEnvironment,
 } from '@firebase/rules-unit-testing';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { authed, makeEnv, UIDS } from './helpers.js';
+import { deleteDoc, doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { authed, makeEnv, seedUser, UIDS } from './helpers.js';
 
 let env: RulesTestEnvironment;
 
@@ -71,5 +71,14 @@ describe('comments rules', () => {
   it('正常な create は成功', async () => {
     const db = authed(env, UIDS.alice).firestore();
     await assertSucceeds(setDoc(doc(db, 'comments/c1'), baseComment(UIDS.alice)));
+  });
+
+  it('管理者は他者の comment を delete できる', async () => {
+    await seedUser(env, UIDS.bob, '管理者');
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'comments/c1'), baseComment(UIDS.alice));
+    });
+    const db = authed(env, UIDS.bob).firestore();
+    await assertSucceeds(deleteDoc(doc(db, 'comments/c1')));
   });
 });

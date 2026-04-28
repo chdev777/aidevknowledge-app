@@ -4,8 +4,8 @@ import {
   assertSucceeds,
   type RulesTestEnvironment,
 } from '@firebase/rules-unit-testing';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { authed, makeEnv, UIDS } from './helpers.js';
+import { doc, deleteDoc, getDoc, setDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { authed, makeEnv, seedUser, UIDS } from './helpers.js';
 
 let env: RulesTestEnvironment;
 
@@ -49,8 +49,8 @@ describe('favorites rules', () => {
   });
 });
 
-describe('tags / projects rules', () => {
-  it('tags は認証ユーザーが read 可', async () => {
+describe('tags rules', () => {
+  it('認証ユーザーは tags を read できる', async () => {
     await env.withSecurityRulesDisabled(async (ctx) => {
       await setDoc(doc(ctx.firestore(), 'tags/t1'), { name: 'RAG', type: '技術' });
     });
@@ -58,12 +58,52 @@ describe('tags / projects rules', () => {
     await assertSucceeds(getDoc(doc(db, 'tags/t1')));
   });
 
-  it('tags への書込は全ユーザー拒否（admin SDK 専用）', async () => {
+  it('一般ユーザーは tags を create できない', async () => {
+    await seedUser(env, UIDS.alice, 'DX推進');
     const db = authed(env, UIDS.alice).firestore();
     await assertFails(setDoc(doc(db, 'tags/t99'), { name: 'X', type: '技術' }));
   });
 
-  it('projects も同様', async () => {
+  it('管理者は tags を create できる', async () => {
+    await seedUser(env, UIDS.alice, '管理者');
+    const db = authed(env, UIDS.alice).firestore();
+    await assertSucceeds(setDoc(doc(db, 'tags/t99'), { name: 'X', type: '技術' }));
+  });
+
+  it('管理者でも未知の type は拒否', async () => {
+    await seedUser(env, UIDS.alice, '管理者');
+    const db = authed(env, UIDS.alice).firestore();
+    await assertFails(setDoc(doc(db, 'tags/t99'), { name: 'X', type: 'スパム' }));
+  });
+
+  it('管理者でも空の name は拒否', async () => {
+    await seedUser(env, UIDS.alice, '管理者');
+    const db = authed(env, UIDS.alice).firestore();
+    await assertFails(setDoc(doc(db, 'tags/t99'), { name: '', type: '技術' }));
+  });
+
+  it('管理者は tags を update / delete できる', async () => {
+    await seedUser(env, UIDS.alice, '管理者');
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'tags/t1'), { name: 'RAG', type: '技術' });
+    });
+    const db = authed(env, UIDS.alice).firestore();
+    await assertSucceeds(updateDoc(doc(db, 'tags/t1'), { name: 'RAG2', type: '技術' }));
+    await assertSucceeds(deleteDoc(doc(db, 'tags/t1')));
+  });
+
+  it('一般ユーザーは tags を delete できない', async () => {
+    await seedUser(env, UIDS.alice, 'DX推進');
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'tags/t1'), { name: 'RAG', type: '技術' });
+    });
+    const db = authed(env, UIDS.alice).firestore();
+    await assertFails(deleteDoc(doc(db, 'tags/t1')));
+  });
+});
+
+describe('projects rules', () => {
+  it('projects は read 可だが write 不可', async () => {
     const db = authed(env, UIDS.alice).firestore();
     await assertFails(setDoc(doc(db, 'projects/p99'), { name: 'X' }));
   });
