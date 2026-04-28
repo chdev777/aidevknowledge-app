@@ -1,8 +1,73 @@
 # セッション引き継ぎノート
 
-> 最終更新: 2026-04-28（セッション 3 / 管理画面 本実装）
+> 最終更新: 2026-04-28（セッション 4 / 高優先度 + 中優先度タスク消化）
 > 引き継ぎ対象: AIアプリ開発ナレッジ共有ハブ MVP（PoC: ローカルDocker / 本番想定: Firebase Blaze）
-> 直近コミット: `355b0af feat(link): 情報ソース別のブランドロゴアイコンを link-thumb に表示`（コミット前、本セッション分は未コミット）
+> 直近コミット: `9de871b chore(verify): 管理画面の Playwright E2E 検証スクリプトを追加`（本セッション分は未コミット）
+
+---
+
+## セッション 4（2026-04-28 後半）：高優先度 + 中優先度タスク消化
+
+### やったこと
+
+#### 高優先度
+1. **LoginPage の `setState in render` 警告修正** — 既ログイン時のリダイレクトを `useEffect` に移動（`src/pages/LoginPage.tsx`）
+2. **マイページ「お気に入り」タブ実装** — `MyFavorites` コンポーネント新設、4 種類対応の Row 表示（`src/components/me/MyFavorites.tsx`）
+3. **マイページ「下書き」タブ実装** — localStorage の `aidev:draft:*` を読み出し、kind 別に表示。「編集を再開」「破棄」ボタン（`src/components/me/MyDrafts.tsx`）
+4. MyPage の disabled 解除 + 件数バッジ + draftCount ヘルパ（`src/pages/MyPage.tsx`）
+
+#### 中優先度
+5. **本番 CSP 拡張** — GitHub OG / Twitter / Qiita / Cloudinary 等 8 ドメインを `img-src` に追加（`firebase.json`）
+6. **管理画面に「監査ログ」タブ追加** — admin_logs 全件（最大 200）+ action chip + 検索 + snapshot 展開可（`src/pages/admin/tabs/LogsTab.tsx`）
+7. **E2E 主要フロー検証スクリプト** — login → compose link → favorite → comment → MyPage tabs → visibility toggle を 11 ケース網羅（`tools/scripts/verify-flows.mjs`）
+
+#### 既存バグ発見・修正
+8. **コメント query が Firestore Rules と非互換だった** — `where('targetType','==','x').where('targetId','==','y').orderBy('createdAt','desc')` だと Rules の `targetVisibility=='shared' || ownerOf` を query 静的解析で証明できず、本番では `PERMISSION_DENIED`（Emulator では「Property targetVisibility is undefined on object」エラー）。この issue は **Playwright 経由で本物のクライアント SDK 動作を試して初めて発覚**した。
+   - **修正**: `commentsDb.findByTarget` に `mode: 'shared' | 'mine'` を追加。親 visibility に応じて WHERE 句を切替（shared 親 → `targetVisibility=='shared'`、private 親 → `createdBy==uid`）
+   - `CommentList` に `parentVisibility: Visibility` prop を追加。`LinkDetailPage` / `NoteDetailPage` / `AppDetailPage` の呼び出しを更新
+   - 新規 index 2 件追加（`firestore.indexes.json`）
+   - 既存セッションでの「ブラウザ動作確認 OK」は実は本物のクライアント SDK ではなく Admin SDK 経由だった可能性。今後は実機 E2E を必ず通す
+
+### 動作確認結果（2 系統 27/27 ケース PASS）
+
+`tools/scripts/verify-flows.mjs`（11/11）:
+- 既存 link で seed コメント表示 ✓
+- compose で link 投稿 → 詳細遷移 ✓
+- お気に入り ON/OFF/ON ✓
+- コメント投稿 ✓
+- MyPage お気に入りタブで対象表示 + 件数バッジ ✓
+- MyPage 下書きタブ表示 ✓
+- 自分のURL タブで visibility 切替 → /links 一覧から消失 ✓
+
+`tools/scripts/verify-admin.mjs`（16/16、リグレッション確認済）:
+- 管理者 / 一般 ユーザーのガード ✓
+- ロール変更 / タグ CRUD / モデレーション削除 / admin_logs 記録 ✓
+
+### 自動テスト
+- `pnpm lint` ✓
+- `pnpm test` ✓ (43/43)
+- `pnpm test:rules` ✓ (60/60)
+- `pnpm build` ✓
+
+### 「最後の管理者降格不可」を Rules で強制 — 実装スキップ（理由）
+
+中優先度 #6 として挙げていたが、分析の結果**現状の Rules で十分**と判断：
+
+- **自己降格**: `users.update` の self path で `request.resource.data.role == resource.data.role` を要求しているため、既に Rules レベルで不可
+- **管理者数 == 1 のとき他者を降格**: その 1 人は自分（admin UI を使っている人）。管理者は自分以外いないので、降格対象（管理者）は存在しない。トリガー不可能
+- **管理者数 == 2 のとき他者を降格**: 残 1 人は自分（admin）。システムは admin が 1 人いる状態で正常稼働。問題なし
+- **Firestore Console / Admin SDK 経由の直接書換**: Rules 適用外（脅威モデル外）
+
+クライアント側 `usersDb.countByRole + UI alert` のチェックは defense-in-depth として残すが、UI 経路では実際には trigger されない。
+
+### コミット粒度（予定）
+1. `fix(login): setState-in-render 警告を useEffect で解消`
+2. `feat(me): お気に入りタブ・下書きタブの中身を実装`
+3. `feat(admin): 監査ログタブ（LogsTab）を追加`
+4. `chore(csp): GitHub OG / Twitter / Qiita 等の OG 画像ドメインを許可`
+5. `fix(comments): クエリを Firestore Rules 互換に（targetVisibility/createdBy フィルタ）`
+6. `chore(verify): 主要フロー E2E スクリプトを追加`
+7. `docs(handover): セッション 4 の差分を反映`
 
 ---
 
@@ -249,22 +314,22 @@ Spark 制約下では Functions 不可。MVP では「クライアント `increm
 - ✅ Tweaks パネル（テーマ/アクセント/密度）動作
 
 ### まだ手をつけていない作業
-- **E2E テスト**: 主要フロー（サインアップ → 投稿 → コメント → 採用 → お気に入り → 公開切替 → 管理者操作）を Playwright で網羅。`tools/scripts/verify-list-pages.mjs` のような one-off は存在
 - **本番 Blaze 移行**: `docs/runbooks/deploy.md` の 10 ステップ未実行
 - **Cloud Functions**: 集計（answerCount/stats/タグ件数）+ OG 取得 + 課金停止 + blocking trigger + 招待フロー
-- **マイページのお気に入りタブ・下書きタブ**: タブ枠は実装済、中身（タブ切替時の表示）は disabled
-- **管理画面の手動 E2E**: 機能本実装は済（セッション 3）。ブラウザでの実機確認はまだ → 次回ログイン時に検証
-- **管理画面の拡張候補**: 招待（メール）/ 監査ログ専用ページ / private 投稿のモデレーション（要 Rules 拡張） / 「最後の管理者降格不可」を Rules で強制（現状はクライアント UX チェックのみ）
+- **管理画面の拡張候補（Phase 3）**: 招待（メール）/ private 投稿のモデレーション（要 Rules 拡張）
+- **E2E 拡張**: サインアップ・Q&A 採用フロー・パスワードリセット等は未カバー（verify-flows.mjs は login 以降のみ）
+- **質問詳細（QADetailPage）の答案コメント表示**: 答案には CommentList 等は使われていないが、確認はしていない（仕様であれば不要）
 
 ### 既知の留意点
 - **Vite HMR**: `usePolling: true, interval: 5000ms`。500ms に下げると CPU 飽和+ HTML 応答秒単位遅延
 - **TanStack Query v5 `enabled:false` で `isPending:true`**: ロード判定は `isFetching` を使う
 - **Firestore は `ignoreUndefinedProperties: true`**（`src/lib/firebase/client.ts` で設定）
 - **コミットメッセージは日本語**（type prefix のみ英語）
-- **本番 CSP**: `img-src` は限定的（GitHub OG 画像 `opengraph.githubassets.com` 等は本番で表示されない）。デプロイ時に `firebase.json` の CSP 拡張要検討
+- **本番 CSP**: `img-src` に GitHub OG 等を追加済（セッション 4）。新ドメインから OG 画像を出すときは `firebase.json` を更新
 - **og-proxy の Twitter oEmbed**: 公開ツイート/プロフィールのみ動作。削除/非公開ツイートは空応答 → ユーザーに通知される
 - **rules テスト用 env**: `FIRESTORE_EMULATOR_HOST=firebase-emulator:8080` を `.env` に追加済。`docker compose up -d --force-recreate app` で env を反映する必要があるケースあり
 - **モデレーション対象は shared 投稿のみ**: 管理者でも他者の private 投稿は read 不可（Rules で制限）。private のモデレーションは Phase 3 で要件次第
+- **コメント query は Rules 互換に注意**: `commentsDb.findByTarget` は必ず `mode: 'shared' | 'mine'` を渡す（Rules 静的解析を満たすため）。新たに別 collection で同等の visibility 系 read rule を書くときも同じ落とし穴に注意
 
 ### テストアカウント
 詳細は [docs/runbooks/test-accounts.md](docs/runbooks/test-accounts.md)。
