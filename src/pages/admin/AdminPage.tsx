@@ -6,8 +6,9 @@ import { UsersTab } from './tabs/UsersTab.js';
 import { TagsTab } from './tabs/TagsTab.js';
 import { ModerationTab } from './tabs/ModerationTab.js';
 import { LogsTab } from './tabs/LogsTab.js';
+import { FeedbackTab } from './tabs/FeedbackTab.js';
 
-type TabId = 'users' | 'tags' | 'moderation' | 'logs';
+type TabId = 'users' | 'tags' | 'moderation' | 'feedback' | 'logs';
 
 interface TabDef {
   id: TabId;
@@ -19,11 +20,18 @@ const TABS: TabDef[] = [
   { id: 'users', label: 'ユーザー', icon: 'user' },
   { id: 'tags', label: 'タグ', icon: 'tag' },
   { id: 'moderation', label: 'モデレーション', icon: 'admin' },
+  { id: 'feedback', label: 'フィードバック', icon: 'message' },
   { id: 'logs', label: '監査ログ', icon: 'note' },
 ];
 
 function isTabId(v: string | null): v is TabId {
-  return v === 'users' || v === 'tags' || v === 'moderation' || v === 'logs';
+  return (
+    v === 'users' ||
+    v === 'tags' ||
+    v === 'moderation' ||
+    v === 'feedback' ||
+    v === 'logs'
+  );
 }
 
 export function AdminPage() {
@@ -87,6 +95,7 @@ export function AdminPage() {
       {tab === 'users' && <UsersTab />}
       {tab === 'tags' && <TagsTab />}
       {tab === 'moderation' && <ModerationTab />}
+      {tab === 'feedback' && <FeedbackTab />}
       {tab === 'logs' && <LogsTab />}
     </div>
   );

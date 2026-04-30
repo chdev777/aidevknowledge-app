@@ -143,11 +143,12 @@ export function TagsTab() {
         />
         <button
           type="button"
-          className="btn sm"
+          className={creating ? 'btn sm' : 'btn sm btn-primary'}
           onClick={() => setCreating((v) => !v)}
+          aria-label={creating ? 'タグ追加をキャンセル' : 'タグを追加'}
         >
           <Icon name="plus" size={12} />
-          {creating ? 'キャンセル' : '新規タグ'}
+          {creating ? 'キャンセル' : 'タグを追加'}
         </button>
       </div>
 

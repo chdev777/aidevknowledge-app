@@ -294,7 +294,8 @@ service cloud.firestore {
         && request.resource.data.action in [
           'set_role',
           'delete_link', 'delete_qa', 'delete_note', 'delete_app',
-          'create_tag', 'update_tag', 'delete_tag'
+          'create_tag', 'update_tag', 'delete_tag',
+          'set_feedback_status'
         ]
         && request.resource.data.targetType is string
         && request.resource.data.targetId is string
@@ -308,6 +309,37 @@ service cloud.firestore {
     // ========================================
     match /favorites/{uid}/items/{id} {
       allow read, write: if signedIn() && request.auth.uid == uid;
+    }
+
+    // ========================================
+    // feedbacks — ユーザー → 運営の片方向投稿
+    // read/update は管理者のみ。create は本人、status は 'new' で固定。
+    // 一方向遷移（new → ack → resolved）を Rules で強制。
+    // delete は禁止（履歴保持）。
+    // ========================================
+    match /feedbacks/{id} {
+      allow read: if isAdmin();
+
+      allow create: if signedIn()
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.status == 'new'
+        && request.resource.data.category in ['bug', 'feature', 'other']
+        && request.resource.data.message is string
+        && request.resource.data.message.size() > 0
+        && request.resource.data.message.size() <= 1000
+        && request.resource.data.createdAt == request.time;
+
+      // 管理者のみ、status と updatedAt のみ更新可。
+      // 任意の遷移を許容（逆遷移含む）。状態変更はすべて admin_logs に記録される。
+      allow update: if isAdmin()
+        && request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.message == resource.data.message
+        && request.resource.data.category == resource.data.category
+        && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['status', 'updatedAt'])
+        && request.resource.data.status in ['new', 'acknowledged', 'resolved'];
+
+      allow delete: if false;
     }
   }
 }

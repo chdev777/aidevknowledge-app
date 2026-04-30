@@ -809,7 +809,7 @@
   background: var(--ink-3); opacity: 0.7;
 }
 .status-badge[data-status="検証済み"] { color: oklch(0.45 0.10 150); border-color: oklch(0.85 0.08 150); background: oklch(0.97 0.04 150); }
-.status-badge[data-status="採用候補"] { color: var(--accent-ink); border-color: oklch(0.85 0.08 65); background: var(--accent-soft); }
+.status-badge[data-status="採用候補"] { color: var(--accent-ink); border-color: var(--accent); background: var(--accent-soft); }
 .status-badge[data-status="検証中"], .status-badge[data-status="確認中"] { color: oklch(0.45 0.12 85); border-color: oklch(0.85 0.10 85); background: oklch(0.97 0.05 85); }
 .importance-badge {
   display: inline-flex; align-items: center; gap: 5px;
@@ -1010,7 +1010,7 @@
   color: var(--ink-2);
 }
 .comment-type[data-type="impression"] { color: oklch(0.40 0.10 250); border-color: oklch(0.85 0.06 250); background: oklch(0.97 0.03 250); }
-.comment-type[data-type="improve"] { color: var(--accent-ink); border-color: oklch(0.85 0.10 65); background: var(--accent-soft); }
+.comment-type[data-type="improve"] { color: var(--accent-ink); border-color: var(--accent); background: var(--accent-soft); }
 .comment-type[data-type="bug"] { color: oklch(0.45 0.18 25); border-color: oklch(0.85 0.06 25); background: oklch(0.97 0.04 25); }
 .comment-type[data-type="idea"] { color: oklch(0.40 0.10 150); border-color: oklch(0.85 0.08 150); background: oklch(0.97 0.04 150); }
 .comment-type[data-type="tech"] { color: oklch(0.40 0.04 60); border-color: var(--line); background: var(--bg-2); }
@@ -1039,7 +1039,7 @@
 .accepted-mark {
   color: var(--accent-ink);
   background: var(--accent-soft);
-  border: 1px solid oklch(0.85 0.10 65);
+  border: 1px solid var(--accent);
   font-size: 10px;
   padding: 1px 8px;
   border-radius: 999px;
@@ -1062,8 +1062,8 @@
   background: var(--bg-raised);
 }
 .answer-item.is-accepted {
-  border-color: oklch(0.85 0.10 65);
-  background: linear-gradient(0deg, oklch(0.99 0.02 65 / 0.6), var(--bg-raised));
+  border-color: var(--accent);
+  background: linear-gradient(0deg, var(--accent-soft), var(--bg-raised));
 }
 .answer-vote {
   display: flex;
@@ -1244,7 +1244,7 @@
 .me-tab.is-active .me-tab-count {
   background: var(--accent-soft);
   color: var(--accent-ink);
-  border-color: oklch(0.85 0.10 65);
+  border-color: var(--accent);
 }
 
 .me-vis-filter {
@@ -1272,18 +1272,6 @@
   background: var(--ink);
   color: var(--bg);
   border-right-color: var(--ink);
-}
-
-.me-row {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 12px;
-  align-items: center;
-}
-.me-row-main { min-width: 0; }
-.me-row-actions {
-  display: flex;
-  gap: 6px;
 }
 
 .comment-target-link {
@@ -1602,15 +1590,311 @@ body[data-theme="dark"] .link-thumb[data-source="zenn"] {
   background: var(--accent-soft);
   padding: 1px 6px;
   border-radius: 999px;
-  border: 1px solid oklch(0.85 0.10 65);
+  border: 1px solid var(--accent);
   font-family: var(--font-mono);
 }
 /* dark theme: --accent-ink は globals.css 側で未調整のため、
    admin-row-self だけは visible な色に明示上書きする */
 body[data-theme="dark"] .admin-row-self {
-  color: oklch(0.88 0.08 65);
-  border-color: oklch(0.50 0.10 65);
+  color: var(--accent);
+  border-color: var(--accent);
 }
+
+/* ========================================
+   お知らせ（announcements） — Topbar 直下バナー + 一覧ページ
+   ======================================== */
+.announcements-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  margin: 4px 24px 0;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--accent-ink);
+}
+.announcements-banner-icon {
+  font-size: 13px;
+  flex-shrink: 0;
+}
+.announcements-banner-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.announcements-banner-title {
+  font-weight: 500;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.announcements-banner-version {
+  color: var(--ink-3);
+  font-size: 10px;
+}
+.announcements-banner-badge {
+  background: var(--accent);
+  color: #fff;
+  padding: 0 6px;
+  border-radius: 999px;
+  font-size: 9px;
+  font-family: var(--font-mono);
+  letter-spacing: 0.02em;
+}
+.announcements-banner-close {
+  background: transparent;
+  border: 0;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--ink-3);
+  cursor: pointer;
+  padding: 2px 6px;
+}
+.announcements-banner-close:hover { color: var(--ink); }
+body[data-theme="dark"] .announcements-banner {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+body[data-theme="dark"] .announcements-banner-badge {
+  color: var(--bg);
+}
+
+.announcements-list {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+.announcements-release {
+  border-top: 1px solid var(--line);
+  padding-top: 18px;
+}
+.announcements-release-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.announcements-release-date {
+  font-size: 11px;
+  color: var(--ink-3);
+}
+.announcements-version-badge {
+  font-size: 10px;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 1px 8px;
+  color: var(--ink-3);
+}
+.announcements-release-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 12px;
+  color: var(--ink);
+}
+.announcements-entries {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.announcements-entry {
+  display: flex;
+  gap: 10px;
+  padding: 8px 0;
+}
+.announcements-entry-icon {
+  font-size: 16px;
+  flex-shrink: 0;
+}
+.announcements-entry-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.announcements-entry-title {
+  font-weight: 500;
+  color: var(--ink);
+}
+.announcements-entry-badge {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+}
+.announcements-entry-badge.feedback {
+  color: var(--accent-ink);
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+.announcements-entry-badge.admin {
+  color: var(--ink-3);
+  background: var(--bg-2);
+}
+.announcements-entry-desc {
+  font-size: 12px;
+  color: var(--ink-3);
+  line-height: 1.55;
+  margin: 4px 0 0;
+}
+
+/* ========================================
+   フィードバック（feedback）FAB + パネル
+   ======================================== */
+.feedback-fab {
+  position: fixed;
+  right: 16px;
+  bottom: 64px;       /* Tweaks の上にスタック */
+  z-index: 92;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--bg-raised);
+  color: var(--ink-2);
+  font-size: 16px;
+  cursor: pointer;
+  box-shadow: 0 4px 12px -4px oklch(0.22 0.01 60 / 0.18);
+  transition: transform 120ms, border-color 120ms;
+}
+.feedback-fab:hover {
+  border-color: var(--ink-4);
+  transform: translateY(-1px);
+}
+
+.feedback-panel {
+  position: fixed;
+  right: 16px;
+  bottom: 108px;     /* FAB の上 */
+  z-index: 96;
+  width: 320px;
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px -8px oklch(0.22 0.01 60 / 0.25);
+  font-size: 13px;
+  color: var(--ink);
+  overflow: hidden;
+}
+.feedback-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+}
+.feedback-panel-close {
+  background: transparent;
+  border: 0;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--ink-3);
+  cursor: pointer;
+  padding: 0 4px;
+}
+.feedback-panel-close:hover { color: var(--ink); }
+.feedback-panel-close:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.feedback-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+}
+.feedback-cat-group {
+  display: flex;
+  gap: 4px;
+}
+.feedback-cat {
+  flex: 1;
+  padding: 6px 0;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--ink-3);
+  cursor: pointer;
+}
+.feedback-cat.active {
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  border-color: var(--accent);
+}
+body[data-theme="dark"] .feedback-cat.active {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.feedback-message {
+  width: 100%;
+  resize: vertical;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-family: inherit;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--ink);
+}
+.feedback-message:focus {
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}
+.feedback-counter {
+  font-size: 11px;
+  color: var(--ink-3);
+  text-align: right;
+  font-family: var(--font-mono);
+}
+.feedback-counter.warn { color: oklch(0.55 0.16 25); }
+
+.feedback-sent {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 16px;
+}
+.feedback-sent-check {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: oklch(0.92 0.10 150);
+  color: oklch(0.35 0.15 150);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.feedback-sent-sub {
+  font-size: 11px;
+  color: var(--ink-3);
+  margin: 2px 0 0;
+}
+
+/* 管理画面のフィードバック行 */
+.admin-row-feedback {
+  flex-direction: row;
+  align-items: flex-start;
+}
+.feedback-row-message {
+  font-size: 13px;
+  color: var(--ink);
+  white-space: pre-wrap;
+  line-height: 1.55;
+}
+
 .admin-row-meta {
   display: flex;
   gap: 8px;

@@ -9,6 +9,7 @@ export const ADMIN_LOG_ACTIONS = [
   'create_tag',
   'update_tag',
   'delete_tag',
+  'set_feedback_status',
 ] as const;
 
 export type AdminLogAction = (typeof ADMIN_LOG_ACTIONS)[number];

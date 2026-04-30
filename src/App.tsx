@@ -22,6 +22,7 @@ import { ProjectDetailPage } from './pages/projects/ProjectDetailPage.js';
 import { TagsPage } from './pages/tags/TagsPage.js';
 import { FavoritesPage } from './pages/favorites/FavoritesPage.js';
 import { AdminPage } from './pages/admin/AdminPage.js';
+import { AnnouncementsPage } from './pages/AnnouncementsPage.js';
 import { ForbiddenPage } from './pages/ForbiddenPage.js';
 import { NotFoundPage } from './pages/NotFoundPage.js';
 
@@ -69,6 +70,7 @@ export function App() {
                 <Route path="tags" element={<TagsPage />} />
                 <Route path="favorites" element={<FavoritesPage />} />
                 <Route path="admin" element={<AdminPage />} />
+                <Route path="announcements" element={<AnnouncementsPage />} />
                 <Route path="forbidden" element={<ForbiddenPage />} />
                 <Route path="*" element={<NotFoundPage />} />
               </Route>

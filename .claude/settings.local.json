@@ -15,7 +15,15 @@
       "Bash(mkdir -p .claude/skills)",
       "Bash(mkdir -p tools/prompts .claude/hooks .claude/skills)",
       "Bash(touch .claude/hooks/.gitkeep .claude/skills/.gitkeep tools/prompts/.gitkeep)",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(curl -s -o /dev/null -w \"emulator-ui: %{http_code}\\\\n\" http://localhost:4200)",
+      "Bash(curl -s -o /dev/null -w \"app: %{http_code}\\\\n\" http://localhost:3200)",
+      "Bash(curl -s http://localhost:9099/)",
+      "Bash(curl -s \"http://localhost:4200/emulator/v1/projects\")",
+      "Bash(curl -s \"http://localhost:9099/emulator/v1/projects/aidevknowledge-poc/accounts\")",
+      "Bash(curl -s \"http://localhost:9099/emulator/v1/projects/aidev-knowledge-dev/accounts\")",
+      "Bash(curl -sv \"http://localhost:9099/emulator/v1/projects/aidev-knowledge-dev/accounts\")",
+      "Bash(curl -s \"http://localhost:9299/emulator/v1/projects/aidev-knowledge-dev/accounts\")"
     ]
   }
 }
