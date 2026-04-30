@@ -49,14 +49,21 @@ export async function verifyFirebaseIdToken(
     issuer: `https://securetoken.google.com/${projectId}`,
     audience: projectId,
     algorithms: ['RS256'],
+    // Worker と Firebase の時刻ずれを許容（5 秒）。Admin SDK 公式実装と整合
+    clockTolerance: '5s',
   });
 
   if (!payload.sub) {
     throw new Error('token missing sub (uid)');
   }
+  const nowSec = Math.floor(Date.now() / 1000);
+  const tol = 5;
   const authTime = payload['auth_time'];
-  if (typeof authTime === 'number' && authTime > Math.floor(Date.now() / 1000)) {
+  if (typeof authTime === 'number' && authTime > nowSec + tol) {
     throw new Error('auth_time is in the future');
+  }
+  if (typeof payload.iat === 'number' && payload.iat > nowSec + tol) {
+    throw new Error('iat is in the future');
   }
 
   return { ...payload, uid: payload.sub } as FirebaseTokenPayload;

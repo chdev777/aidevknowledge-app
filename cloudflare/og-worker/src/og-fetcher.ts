@@ -30,10 +30,48 @@ const REJECT_HOST_PATTERNS = [
   /^fc[0-9a-f]{2}:/i,
   /^fd[0-9a-f]{2}:/i,
   /^fe80:/i,
+  // クラウドメタデータエンドポイント
+  /^metadata\.google\.internal$/i,
+  /^metadata\.goog$/i,
+  /^169\.254\.169\.254$/, // GCP / AWS / Azure メタデータ
+  /^100\.100\.100\.200$/, // Alibaba Cloud
 ];
 
 function isRejectedHost(host: string): boolean {
   return REJECT_HOST_PATTERNS.some((re) => re.test(host));
+}
+
+const MAX_REDIRECT_HOPS = 3;
+
+/**
+ * 自前の redirect 解決。各ホップで Location ヘッダのホストを isRejectedHost で検証し、
+ * 攻撃者が `http://attacker.com → http://169.254.169.254/` のように内部 IP に
+ * 飛ばすパターンを防ぐ。
+ */
+async function fetchFollowingRedirects(
+  url: string,
+  init: RequestInit & { cf?: RequestInitCfProperties },
+): Promise<Response> {
+  let currentUrl = url;
+  for (let hop = 0; hop <= MAX_REDIRECT_HOPS; hop++) {
+    const parsed = new URL(currentUrl);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      throw new Error(`unsupported protocol after redirect: ${parsed.protocol}`);
+    }
+    if (isRejectedHost(parsed.hostname)) {
+      throw new Error(`refused: blocked host on redirect (${parsed.hostname})`);
+    }
+
+    const res = await fetch(currentUrl, { ...init, redirect: 'manual' });
+    if (res.status >= 300 && res.status < 400) {
+      const loc = res.headers.get('location');
+      if (!loc) return res; // location 無しの 3xx は終端扱い
+      currentUrl = new URL(loc, currentUrl).toString();
+      continue;
+    }
+    return res;
+  }
+  throw new Error(`too many redirects (>${MAX_REDIRECT_HOPS})`);
 }
 
 const UA =
@@ -61,14 +99,13 @@ export async function fetchOg(targetUrl: string): Promise<OgMeta> {
     if (oembed) return oembed;
   }
 
-  const res = await fetch(targetUrl, {
+  const res = await fetchFollowingRedirects(targetUrl, {
     method: 'GET',
     headers: {
       'user-agent': UA,
       accept: 'text/html,application/xhtml+xml',
       'accept-language': 'ja,en;q=0.9',
     },
-    redirect: 'follow',
     cf: {
       // Cloudflare 側のキャッシュ設定（Workers 専用フィールド）
       cacheTtl: 300,

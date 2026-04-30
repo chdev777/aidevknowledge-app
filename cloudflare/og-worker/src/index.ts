@@ -57,15 +57,18 @@ app.use('/api/*', async (c, next) => {
   return;
 });
 
+// /api/* 全ルートに認証必須（/health は除外）
+app.use('/api/*', async (c, next) => {
+  const mw = requireAuth(c.env.FIREBASE_PROJECT_ID);
+  return mw(c, next);
+});
+
 app.get('/health', (c) =>
   c.json({ ok: true, ts: new Date().toISOString() }),
 );
 
 // ----- OG メタ取得 -----
-app.get('/api/og', async (c, next) => {
-  const mw = requireAuth(c.env.FIREBASE_PROJECT_ID);
-  return mw(c, next);
-}, async (c) => {
+app.get('/api/og', async (c) => {
   const url = (c.req.query('url') ?? '').trim();
   if (!url) return c.json({ error: 'url is required' }, 400);
 
@@ -84,10 +87,7 @@ app.get('/api/og', async (c, next) => {
 });
 
 // ----- Storage 署名URL（アップロード） -----
-app.post('/api/storage/upload-url', async (c, next) => {
-  const mw = requireAuth(c.env.FIREBASE_PROJECT_ID);
-  return mw(c, next);
-}, async (c) => {
+app.post('/api/storage/upload-url', async (c) => {
   if (!c.env.FIREBASE_CLIENT_EMAIL || !c.env.FIREBASE_PRIVATE_KEY || !c.env.STORAGE_BUCKET) {
     return c.json(
       { error: 'storage not configured', detail: 'Storage backend (Firebase or R2) は未設定。PoC option B では未使用。' },
@@ -152,10 +152,7 @@ app.post('/api/storage/upload-url', async (c, next) => {
 });
 
 // ----- Storage 署名URL（ダウンロード） -----
-app.get('/api/storage/download-url', async (c, next) => {
-  const mw = requireAuth(c.env.FIREBASE_PROJECT_ID);
-  return mw(c, next);
-}, async (c) => {
+app.get('/api/storage/download-url', async (c) => {
   if (!c.env.FIREBASE_CLIENT_EMAIL || !c.env.FIREBASE_PRIVATE_KEY || !c.env.STORAGE_BUCKET) {
     return c.json(
       { error: 'storage not configured', detail: 'Storage backend は未設定。PoC option B では未使用。' },
