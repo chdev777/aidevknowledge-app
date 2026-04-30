@@ -1,0 +1,26 @@
+name = "aidev-og-worker"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+# 環境変数（本番値は wrangler secret put で設定）
+[vars]
+FIREBASE_PROJECT_ID = "aidevknowledge-app"
+# CORS 許可オリジン（カンマ区切り）。localhost:3200 は dev SPA、
+# pages.dev は本番 Cloudflare Pages（後で配信したら正式 URL に差し替え）
+ALLOWED_ORIGINS = "http://localhost:3200,https://aidev-knowledge.pages.dev"
+
+# シークレット（wrangler secret put でセット）
+# PoC option B（Storage 無効）では認証・OG メタ取得のみで動くので
+# 以下のシークレット投入は不要。Storage 機能を有効化する時に投入する。
+# - FIREBASE_CLIENT_EMAIL    : サービスアカウントメール（Storage 用）
+# - FIREBASE_PRIVATE_KEY     : サービスアカウント秘密鍵（PEM形式、改行は \n）
+# - STORAGE_BUCKET           : aidev-knowledge-prod.appspot.com（Firebase）or R2 バケット名
+
+# レート制限は Cloudflare ダッシュボードから Rate Limiting binding を別途有効化する。
+# 未設定でも index.ts 側で `if (c.env.RATE_LIMITER)` で skip するので動作する。
+# 設定する場合の参考 (現行 wrangler 構文):
+# [[ratelimit]]
+# name = "RATE_LIMITER"
+# namespace_id = "1001"
+# simple = { limit = 100, period = 60 }

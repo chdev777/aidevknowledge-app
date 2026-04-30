@@ -16,6 +16,11 @@ src/**/*.js.map
 .env.local
 .env.*.local
 
+# シークレット類（サービスアカウント JSON 等）
+secrets/
+*-service-account*.json
+firebase-admin*.json
+
 # Firebase Emulator data
 .emulator-data/
 firebase-debug.log
@@ -50,6 +55,7 @@ coverage/
 # 一時ファイル
 *.tmp
 *.bak
+vite.config.ts.timestamp-*.mjs
 
 # Claude Code
 .claude/plans/
