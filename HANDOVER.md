@@ -1,13 +1,116 @@
 # セッション引き継ぎノート
 
-> 最終更新: 2026-04-30（セッション 6 / Cloudflare Workers + Firebase 本番接続）
-> 現在ブランチ: `main`（クリーン、PR #1 / #2 マージ済）
+> 最終更新: 2026-04-30（セッション 7 / Cloudflare Pages デプロイ）
+> 現在ブランチ: `main`（未コミット作業あり）
 > リモート: https://github.com/chdev777/aidevknowledge-app
 > 直近コミット: `9eac4db Merge pull request #2 from chdev777/fix/session5-followups`
 
 ---
 
-## 今回やったこと（セッション 6）
+## 今回やったこと（セッション 7）
+
+SPA を **Cloudflare Pages** にデプロイし、完全クラウド構成 (Pages + Workers + Firebase Spark) を完成させた。
+
+### 1. Cloudflare Pages デプロイ基盤
+
+- **`public/_headers`** 新設: `firebase.json` hosting.headers の CSP / セキュリティヘッダを Cloudflare Pages 形式に移植。`connect-src` に Worker URL (`aidev-og-worker.ipc-claudeapps001.workers.dev`) を追加。`/assets/*` 用に `Cache-Control: public, max-age=31536000, immutable`。
+- **`public/_redirects`** 新設: SPA history fallback (`/* /index.html 200`)。
+- **`src/test/unit/pages-headers.spec.ts`** TDD で先に書いた検証 9 ケース（CSP の Worker URL / frame-ancestors / script-src 厳格 / セキュリティヘッダ存在）。
+
+### 2. 本番ビルドの env 解決問題を修正
+
+`pnpm build --mode production` で Vite が `aidev-knowledge-dev`（開発用 project ID）を焼き付けてしまっていた。原因は **docker-compose の `env_file: - .env` で VITE_* が container env に注入され、Vite の loadEnv が process.env を上書きしないため**。
+
+→ `tools/scripts/build-prod.sh` を新設。ビルド前に `unset $VITE_*` してから `vite build --mode production` を呼ぶ。`pnpm build:prod` で実行可能。`.env.production.local` 不在ガードあり。
+
+### 3. デプロイスクリプト
+
+- **`tools/scripts/deploy-pages.sh`**: `production` / `preview` / `--dry-run` の 3 モード。`build:prod` → `wrangler pages deploy dist` を一発実行。
+- 初回プロジェクト作成は `wrangler pages project create aidev-knowledge-hub --production-branch=main` を runbook に記載。
+
+### 4. 実デプロイ完了
+
+- **本番 URL**: `https://aidev-knowledge-hub.pages.dev`
+- アップロード 8 ファイル（index.html / `_headers` / `_redirects` / assets 5）
+- レスポンスヘッダで CSP / HSTS / X-Frame-Options 全部 OK
+
+### 5. Worker 設定更新
+
+`cloudflare/og-worker/wrangler.toml` の `ALLOWED_ORIGINS` を `aidev-knowledge.pages.dev`（古い想定 URL）→ `aidev-knowledge-hub.pages.dev`（実 URL）に修正、`wrangler deploy` で再デプロイ。
+
+### 6. E2E 検証スクリプト
+
+**`tools/scripts/verify-cf-pages.mjs`** を新設、7 項目を確認:
+
+1. ルート 200 + index.html
+2. セキュリティヘッダ 6 種すべて適用
+3. CSP に Worker URL
+4. SPA fallback (deep link → index.html 200)
+5. `/assets/*` の immutable cache
+6. Worker CORS preflight が Pages origin から 通過 (`access-control-allow-origin: https://aidev-knowledge-hub.pages.dev`)
+7. Worker `/health` 200
+
+→ **全 PASS**。
+
+### 7. ドキュメント
+
+- **`docs/runbooks/prod-deploy.md`** 新設: 初回プロジェクト作成 / 通常デプロイ / Worker デプロイ / Firebase Console 手動作業（承認済みドメイン追加・テストユーザー作成）/ 検証 / ロールバック手順を網羅。
+
+---
+
+## 検証結果（セッション 7）
+
+- ✅ `pnpm lint`（tsc）PASS
+- ✅ `pnpm test`（unit）71/71 PASS（pages-headers 9 ケース追加）
+- ✅ `pnpm test:rules` 82/82 PASS
+- ✅ `pnpm build:prod` 成功（gzip JS = 263 KiB / CSS = 10.5 KiB）
+- ✅ Worker 再デプロイ成功（145 KiB / 15ms 起動）
+- ✅ `verify-cf-pages.mjs` 7/7 PASS
+- ✅ Pages 本番 URL からトップページ取得 / SPA deep link 200 / immutable cache 確認
+
+---
+
+## 残タスク（次セッション以降）
+
+### Firebase Console 手動作業（**まだ未実施**、本番ログイン前に必須）
+
+1. [Authentication → Settings → 承認済みドメイン](https://console.firebase.google.com/project/aidevknowledge-app/authentication/settings) に `aidev-knowledge-hub.pages.dev` を追加
+2. テストユーザーで本番 SPA に signIn → users/{uid} bootstrap が走るか実機確認
+
+未対応だと `auth/unauthorized-domain` で signIn 失敗するので最優先。
+
+### MEDIUM 課題（session 5 由来、引き続き）
+
+| # | 内容 |
+|---|---|
+| M1 | FeedbackTab の `alert()` を共通 Toast に統一 |
+| M2 | Sidebar 未読バッジの同期: `useLocation` 依存追加 or storage event |
+| M3 | TanStack Query → 将来 `onSnapshot` 化（複数管理者の同時操作対応） |
+| M4 | `feedback update + admin_logs` を `writeBatch` で原子化 |
+| M5 | 未使用 Firestore index に注記 or 削除（`feedbacks` の status / category 複合） |
+| M6 | バナーのモバイル `@media` 対応 |
+| M7 | localStorage `lastSeen` の改ざん耐性（不正バージョン弾く） |
+
+### 後続フェーズ
+
+- **CI 整備**: GitHub Actions で `pnpm lint` + `pnpm test:rules` + `pnpm test` 実行 + Pages preview deploy
+- **本番 seed スクリプト**: tags / 初期管理者 / changelog 等の本番投入手順
+- **R2 検討**: 添付・アバター機能を有効化したくなった時の Storage 代替
+
+---
+
+## 過去セッション
+
+- **session 1-4**: 基本機能（PoC・seed・E2E・auth・URL/Q&A/notes/apps）
+- **session 5**: お知らせ + フィードバック（PR #1）
+- **session 6**: CSS 修正 + Cloudflare Workers 移行 + 本人削除 UI + コードレビュー対応（PR #1, #2）
+- **session 7**: Cloudflare Pages デプロイ → 完全クラウド構成完了
+
+---
+
+## セッション 6 までの内容（archive）
+
+### 今回やったこと（セッション 6）
 
 ### 1. CSS バグ修正
 
@@ -162,12 +265,9 @@ PoC を本番運用可能な構成にするための基盤整備。og-proxy（Ex
 
 ## 残タスク（優先度別）
 
-### 次セッションで対応推奨
+### 次セッションで対応推奨（session 7 時点の更新）
 
-1. **Cloudflare Pages に SPA をデプロイ** — 完全クラウド構成完了
-   - `pnpm build --mode production` → `wrangler pages deploy dist --project-name=aidev-knowledge-hub`
-   - Worker `ALLOWED_ORIGINS` に Pages URL 追加
-   - Firebase Console の承認済みドメインに Pages URL 追加
+1. ~~**Cloudflare Pages に SPA をデプロイ**~~ — **session 7 で完了**（`https://aidev-knowledge-hub.pages.dev`）
 2. **本番 Firestore に管理者ユーザーのプロファイルレコードを投入** — Auth 作成後に自動で `users/{uid}` を作る trigger が無いので手動 or seed スクリプトの本番版が必要
 
 ### MEDIUM 課題（session 5 レビュー由来、将来対応）
