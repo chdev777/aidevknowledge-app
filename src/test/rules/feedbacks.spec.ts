@@ -75,6 +75,56 @@ describe('feedbacks rules — create', () => {
       }),
     );
   });
+
+  it('userHandleSnap が string でない値は拒否', async () => {
+    const db = authed(env, UIDS.alice).firestore();
+    await assertFails(
+      setDoc(doc(db, 'feedbacks/f1'), {
+        ...baseFb(UIDS.alice),
+        userHandleSnap: 12345,
+      }),
+    );
+  });
+
+  it('33 文字の userHandleSnap は拒否', async () => {
+    const db = authed(env, UIDS.alice).firestore();
+    await assertFails(
+      setDoc(doc(db, 'feedbacks/f1'), {
+        ...baseFb(UIDS.alice),
+        userHandleSnap: 'x'.repeat(33),
+      }),
+    );
+  });
+
+  it('65 文字の userNameSnap は拒否', async () => {
+    const db = authed(env, UIDS.alice).firestore();
+    await assertFails(
+      setDoc(doc(db, 'feedbacks/f1'), {
+        ...baseFb(UIDS.alice),
+        userNameSnap: 'x'.repeat(65),
+      }),
+    );
+  });
+
+  it('257 文字の currentView は拒否', async () => {
+    const db = authed(env, UIDS.alice).firestore();
+    await assertFails(
+      setDoc(doc(db, 'feedbacks/f1'), {
+        ...baseFb(UIDS.alice),
+        currentView: '/' + 'a'.repeat(256),
+      }),
+    );
+  });
+
+  it('updatedAt が createdAt と一致しない場合は拒否', async () => {
+    const db = authed(env, UIDS.alice).firestore();
+    await assertFails(
+      setDoc(doc(db, 'feedbacks/f1'), {
+        ...baseFb(UIDS.alice),
+        updatedAt: new Date(0),
+      }),
+    );
+  });
 });
 
 describe('feedbacks rules — read', () => {

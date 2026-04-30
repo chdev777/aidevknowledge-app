@@ -314,7 +314,8 @@ service cloud.firestore {
     // ========================================
     // feedbacks — ユーザー → 運営の片方向投稿
     // read/update は管理者のみ。create は本人、status は 'new' で固定。
-    // 一方向遷移（new → ack → resolved）を Rules で強制。
+    // status 遷移は双方向自由（new ↔ acknowledged ↔ resolved）。
+    // 状態変更はすべて admin_logs に記録されるため逆遷移も監査可能。
     // delete は禁止（履歴保持）。
     // ========================================
     match /feedbacks/{id} {
@@ -327,7 +328,16 @@ service cloud.firestore {
         && request.resource.data.message is string
         && request.resource.data.message.size() > 0
         && request.resource.data.message.size() <= 1000
-        && request.resource.data.createdAt == request.time;
+        // 表示用スナップショット: 改ざん耐性は限定的だが size 上限と string 型は強制
+        && request.resource.data.userHandleSnap is string
+        && request.resource.data.userHandleSnap.size() <= 32
+        && request.resource.data.userNameSnap is string
+        && request.resource.data.userNameSnap.size() <= 64
+        // 送信元ビューパス（例: '/links'）。256 字あれば十分
+        && request.resource.data.currentView is string
+        && request.resource.data.currentView.size() <= 256
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time;
 
       // 管理者のみ、status と updatedAt のみ更新可。
       // 任意の遷移を許容（逆遷移含む）。状態変更はすべて admin_logs に記録される。

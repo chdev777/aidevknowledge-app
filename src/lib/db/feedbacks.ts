@@ -89,7 +89,10 @@ export async function findRecent(count = 200): Promise<Feedback[]> {
 
 /**
  * ステータス更新。同状態は no-op（NO_CHANGE）として早期 return。
- * 任意の status 間遷移を許容（逆遷移含む）。
+ * 双方向遷移を許容（逆遷移含む）。状態変更は admin_logs に記録される。
+ *
+ * INVALID_TRANSITION ブランチは型システムが弾く想定だが、文字列キャスト等の
+ * 異常系混入に対する防御として残す（reachableStatuses は将来の制限拡張用フック）。
  */
 export async function setStatus(
   id: string,
@@ -100,7 +103,6 @@ export async function setStatus(
     throw new Error('NO_CHANGE');
   }
   if (!reachableStatuses(current).includes(next)) {
-    // 念のため: 未知の status 値が渡ってきた場合だけ防御的に拒否
     throw new Error('INVALID_TRANSITION');
   }
   await updateDoc(doc(db, `${COL}/${id}`), {

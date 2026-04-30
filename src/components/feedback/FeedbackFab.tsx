@@ -115,6 +115,9 @@ export function FeedbackFab() {
       return;
     }
     setOpen(false);
+    // A11y: 閉じた直後にトリガー要素（FAB）へフォーカスを戻す
+    // requestAnimationFrame で React の DOM 更新後に遅延実行
+    requestAnimationFrame(() => fabRef.current?.focus());
   }
 
   function onSubmit(e: React.FormEvent) {
@@ -141,9 +144,15 @@ export function FeedbackFab() {
       </button>
 
       {open && (
-        <div ref={panelRef} className="feedback-panel" role="dialog" aria-label="フィードバック">
+        <div
+          ref={panelRef}
+          className="feedback-panel"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="feedback-panel-title"
+        >
           <div className="feedback-panel-head">
-            <strong>フィードバック</strong>
+            <strong id="feedback-panel-title">フィードバック</strong>
             <button
               type="button"
               className="feedback-panel-close"
