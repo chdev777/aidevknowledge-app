@@ -1274,18 +1274,6 @@
   border-right-color: var(--ink);
 }
 
-.me-row {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 12px;
-  align-items: center;
-}
-.me-row-main { min-width: 0; }
-.me-row-actions {
-  display: flex;
-  gap: 6px;
-}
-
 .comment-target-link {
   font-size: 11px;
   color: var(--accent-ink);
