@@ -8,7 +8,7 @@ compatibility_flags = ["nodejs_compat"]
 FIREBASE_PROJECT_ID = "aidevknowledge-app"
 # CORS 許可オリジン（カンマ区切り）。localhost:3200 は dev SPA、
 # pages.dev は本番 Cloudflare Pages（後で配信したら正式 URL に差し替え）
-ALLOWED_ORIGINS = "http://localhost:3200,https://aidev-knowledge.pages.dev"
+ALLOWED_ORIGINS = "http://localhost:3200,https://aidev-knowledge-hub.pages.dev"
 
 # シークレット（wrangler secret put でセット）
 # PoC option B（Storage 無効）では認証・OG メタ取得のみで動くので
