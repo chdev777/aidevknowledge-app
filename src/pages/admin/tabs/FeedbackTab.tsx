@@ -77,7 +77,8 @@ export function FeedbackTab() {
     onError: (err) => {
       const code = (err as Error).message;
       if (code === 'INVALID_TRANSITION') {
-        alert('このステータスへの遷移は許可されていません（一方向遷移）。');
+        // 通常 UI からは到達しない（FEEDBACK_STATUSES 以外の文字列が混入した時のみ）
+        alert('無効な状態が指定されました。');
       } else {
         logger.error('feedback setStatus failed', { err: String(err) });
         alert('ステータス更新に失敗しました。');
@@ -115,7 +116,7 @@ export function FeedbackTab() {
           groupLabel="状態"
         />
         <div className="admin-toolbar-note">
-          合計 {totalCount} 件 / 未対応 {newCount} 件 ・ 一方向遷移（new → acknowledged → resolved）
+          合計 {totalCount} 件 / 未対応 {newCount} 件 ・ 状態は自由に変更可能（変更履歴は監査ログに記録）
         </div>
       </div>
 
@@ -153,8 +154,8 @@ function FeedbackRow({
   pending: boolean;
 }) {
   const reachable = reachableStatuses(fb.status);
-  // 3 状態（新規 / 確認済み / 対応済み）すべて表示。現在の状態 + 一方向遷移先のみ
-  // 選択可能とし、逆遷移は <option disabled> で UI レベルで防ぐ。
+  // 3 状態（新規 / 確認済み / 対応済み）すべて表示。現在の状態 + 遷移可能な状態
+  // （現状は自分以外すべて）を選択可能とする。逆遷移も含めて運用上自由に変更可能。
   const canPick = (s: FeedbackStatus) => s === fb.status || reachable.includes(s);
   const handleChange = (next: FeedbackStatus) => {
     if (next === fb.status) return; // 同じ状態は no-op
