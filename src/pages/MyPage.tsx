@@ -11,6 +11,7 @@ import {
 } from '../lib/db/index.js';
 import { useAuth } from '../lib/firebase/auth-context.js';
 import { VisibilityToggle } from '../components/me/VisibilityToggle.js';
+import { DeleteOwnButton } from '../components/me/DeleteOwnButton.js';
 import { Spinner } from '../components/shared/Spinner.js';
 import { EmptyState } from '../components/shared/EmptyState.js';
 import { Icon, type IconName } from '../components/shared/Icon.js';
@@ -375,6 +376,17 @@ function LinkMeRow({ link, uid }: { link: LinkDoc; uid: string }) {
           ]}
           setVisibility={(v) => linksDb.updateVisibility(link.id, v)}
         />
+        <DeleteOwnButton
+          kind="URL"
+          title={link.title}
+          onDelete={() => linksDb.remove(link.id)}
+          invalidateKeys={[
+            ['me', 'links', uid],
+            ['links', 'shared'],
+            ['home', 'recentLinks'],
+            ['sidebar', 'counts'],
+          ]}
+        />
       </div>
     </div>
   );
@@ -404,6 +416,17 @@ function QuestionMeRow({ q, uid }: { q: Question; uid: string }) {
             ['home', 'unansweredQuestions'],
           ]}
           setVisibility={(v) => questionsDb.updateVisibility(q.id, v)}
+        />
+        <DeleteOwnButton
+          kind="質問"
+          title={q.title}
+          onDelete={() => questionsDb.remove(q.id)}
+          invalidateKeys={[
+            ['me', 'questions', uid],
+            ['questions', 'shared'],
+            ['home', 'unansweredQuestions'],
+            ['sidebar', 'counts'],
+          ]}
         />
       </div>
     </div>
@@ -436,6 +459,17 @@ function NoteMeRow({ note, uid }: { note: Note; uid: string }) {
           ]}
           setVisibility={(v) => notesDb.updateVisibility(note.id, v)}
         />
+        <DeleteOwnButton
+          kind="検証メモ"
+          title={note.title}
+          onDelete={() => notesDb.remove(note.id)}
+          invalidateKeys={[
+            ['me', 'notes', uid],
+            ['notes', 'shared'],
+            ['home', 'recentNotes'],
+            ['sidebar', 'counts'],
+          ]}
+        />
       </div>
     </div>
   );
@@ -464,6 +498,17 @@ function AppMeRow({ app, uid }: { app: AiApp; uid: string }) {
             ['home', 'recentApps'],
           ]}
           setVisibility={(v) => appsDb.updateVisibility(app.id, v)}
+        />
+        <DeleteOwnButton
+          kind="作成アプリ"
+          title={app.name}
+          onDelete={() => appsDb.remove(app.id)}
+          invalidateKeys={[
+            ['me', 'apps', uid],
+            ['apps', 'shared'],
+            ['home', 'recentApps'],
+            ['sidebar', 'counts'],
+          ]}
         />
       </div>
     </div>
