@@ -809,7 +809,7 @@
   background: var(--ink-3); opacity: 0.7;
 }
 .status-badge[data-status="検証済み"] { color: oklch(0.45 0.10 150); border-color: oklch(0.85 0.08 150); background: oklch(0.97 0.04 150); }
-.status-badge[data-status="採用候補"] { color: var(--accent-ink); border-color: oklch(0.85 0.08 65); background: var(--accent-soft); }
+.status-badge[data-status="採用候補"] { color: var(--accent-ink); border-color: var(--accent); background: var(--accent-soft); }
 .status-badge[data-status="検証中"], .status-badge[data-status="確認中"] { color: oklch(0.45 0.12 85); border-color: oklch(0.85 0.10 85); background: oklch(0.97 0.05 85); }
 .importance-badge {
   display: inline-flex; align-items: center; gap: 5px;
@@ -1010,7 +1010,7 @@
   color: var(--ink-2);
 }
 .comment-type[data-type="impression"] { color: oklch(0.40 0.10 250); border-color: oklch(0.85 0.06 250); background: oklch(0.97 0.03 250); }
-.comment-type[data-type="improve"] { color: var(--accent-ink); border-color: oklch(0.85 0.10 65); background: var(--accent-soft); }
+.comment-type[data-type="improve"] { color: var(--accent-ink); border-color: var(--accent); background: var(--accent-soft); }
 .comment-type[data-type="bug"] { color: oklch(0.45 0.18 25); border-color: oklch(0.85 0.06 25); background: oklch(0.97 0.04 25); }
 .comment-type[data-type="idea"] { color: oklch(0.40 0.10 150); border-color: oklch(0.85 0.08 150); background: oklch(0.97 0.04 150); }
 .comment-type[data-type="tech"] { color: oklch(0.40 0.04 60); border-color: var(--line); background: var(--bg-2); }
@@ -1039,7 +1039,7 @@
 .accepted-mark {
   color: var(--accent-ink);
   background: var(--accent-soft);
-  border: 1px solid oklch(0.85 0.10 65);
+  border: 1px solid var(--accent);
   font-size: 10px;
   padding: 1px 8px;
   border-radius: 999px;
@@ -1062,8 +1062,8 @@
   background: var(--bg-raised);
 }
 .answer-item.is-accepted {
-  border-color: oklch(0.85 0.10 65);
-  background: linear-gradient(0deg, oklch(0.99 0.02 65 / 0.6), var(--bg-raised));
+  border-color: var(--accent);
+  background: linear-gradient(0deg, var(--accent-soft), var(--bg-raised));
 }
 .answer-vote {
   display: flex;
@@ -1244,7 +1244,7 @@
 .me-tab.is-active .me-tab-count {
   background: var(--accent-soft);
   color: var(--accent-ink);
-  border-color: oklch(0.85 0.10 65);
+  border-color: var(--accent);
 }
 
 .me-vis-filter {
@@ -1602,14 +1602,14 @@ body[data-theme="dark"] .link-thumb[data-source="zenn"] {
   background: var(--accent-soft);
   padding: 1px 6px;
   border-radius: 999px;
-  border: 1px solid oklch(0.85 0.10 65);
+  border: 1px solid var(--accent);
   font-family: var(--font-mono);
 }
 /* dark theme: --accent-ink は globals.css 側で未調整のため、
    admin-row-self だけは visible な色に明示上書きする */
 body[data-theme="dark"] .admin-row-self {
-  color: oklch(0.88 0.08 65);
-  border-color: oklch(0.50 0.10 65);
+  color: var(--accent);
+  border-color: var(--accent);
 }
 
 /* ========================================
@@ -1622,7 +1622,7 @@ body[data-theme="dark"] .admin-row-self {
   padding: 4px 12px;
   margin: 4px 24px 0;
   background: var(--accent-soft);
-  border: 1px solid oklch(0.85 0.10 65);
+  border: 1px solid var(--accent);
   border-radius: 6px;
   font-size: 12px;
   line-height: 1.3;
@@ -1671,8 +1671,8 @@ body[data-theme="dark"] .admin-row-self {
 }
 .announcements-banner-close:hover { color: var(--ink); }
 body[data-theme="dark"] .announcements-banner {
-  color: oklch(0.88 0.08 65);
-  border-color: oklch(0.50 0.10 65);
+  color: var(--accent);
+  border-color: var(--accent);
 }
 body[data-theme="dark"] .announcements-banner-badge {
   color: var(--bg);
@@ -1748,7 +1748,7 @@ body[data-theme="dark"] .announcements-banner-badge {
 .announcements-entry-badge.feedback {
   color: var(--accent-ink);
   background: var(--accent-soft);
-  border-color: oklch(0.85 0.10 65);
+  border-color: var(--accent);
 }
 .announcements-entry-badge.admin {
   color: var(--ink-3);
@@ -1841,11 +1841,11 @@ body[data-theme="dark"] .announcements-banner-badge {
 .feedback-cat.active {
   background: var(--accent-soft);
   color: var(--accent-ink);
-  border-color: oklch(0.85 0.10 65);
+  border-color: var(--accent);
 }
 body[data-theme="dark"] .feedback-cat.active {
-  color: oklch(0.88 0.08 65);
-  border-color: oklch(0.50 0.10 65);
+  color: var(--accent);
+  border-color: var(--accent);
 }
 .feedback-message {
   width: 100%;
