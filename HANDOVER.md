@@ -1,13 +1,178 @@
 # セッション引き継ぎノート
 
-> 最終更新: 2026-05-01（セッション 8 / 本番 Firestore 立ち上げ + 初期管理者投入）
-> 現在ブランチ: `main`（origin より 3 コミット先行、main 直 push はブロック中）
+> 最終更新: 2026-05-01（セッション 9 / GitHub Actions CI 整備 + Branch protection）
+> 現在ブランチ: `main`（origin と同期、main 直 push はブロック中）
 > リモート: https://github.com/chdev777/aidevknowledge-app
-> 直近コミット: `93aa094 feat(scripts): 本番 Firebase の signIn 検証 + ユーザ bootstrap スクリプト追加`
+> 直近コミット: `5371bb2 Merge pull request #3 from chdev777/feat/ci-and-pending-work`
 
 ---
 
-## 今回やったこと（セッション 8）
+## 今回やったこと（セッション 9）
+
+session 8 で残タスクとして挙がっていた **CI 整備** を実施。GitHub Actions で `lint` / `unit-test` / `rules-test` の自動チェック + `firestore.rules` / `firestore.indexes.json` の自動デプロイを構築し、Branch protection も設定した。
+
+### 1. GitHub Actions ワークフロー新設
+
+**`.github/workflows/ci.yml`**: PR open / push to main で 3 ジョブ並列実行
+- `lint`: `pnpm lint`（tsc --noEmit）
+- `unit-test`: `pnpm test`（vitest）
+- `rules-test`: `firebase emulators:exec` で Firestore Emulator をラップして `pnpm test:rules`
+- `concurrency:` で同一ブランチの古い run はキャンセル
+
+**`.github/workflows/deploy-rules.yml`**: `main` への push で `firestore.rules` / `firestore.indexes.json` / `firebase.json` 変更時のみ起動
+- デプロイ前に Rules テスト再実行（最終防壁）
+- `firebase deploy --only firestore:rules,firestore:indexes` を `FIREBASE_TOKEN` で認証
+- `paths:` フィルタにより通常コード変更ではトリガされない（コスト・誤デプロイ抑止）
+- `workflow_dispatch` で緊急時の手動実行も可能
+
+### 2. GitHub Secrets 登録
+
+`secrets/firebase-ci-token.txt`（session 8 で取得済の CI トークン）を `FIREBASE_TOKEN` 名で登録:
+
+```bash
+gh secret set FIREBASE_TOKEN --body "$(cat secrets/firebase-ci-token.txt)"
+```
+
+### 3. Java バージョン要件の罠
+
+初回 CI 実行で `firebase emulators:exec` が以下のエラーで失敗:
+
+```
+Error: firebase-tools no longer supports Java version before 21.
+Please install a JDK at version 21 or above to get a compatible runtime.
+```
+
+**原因**: 最新の `firebase-tools` (v14+) は **Java 21 以上必須** に変更されていた（以前は Java 11+）。`actions/setup-java@v4` の `java-version: '17'` を `'21'` に修正して解決。両ワークフローに反映。
+
+### 4. PR ベース運用への移行
+
+main 直 push が hook でブロックされたため、`feat/ci-and-pending-work` ブランチを切って **PR #3** で session 6/7/8/9 の蓄積コミット 6 個（CI 修正コミット含む）を一括 push。CI が PR 上で 3 ジョブ全 PASS（Lint 16s / Unit 16s / Rules 32s）したことを確認後、`gh pr merge --merge --delete-branch` でマージ。
+
+### 5. Branch protection 設定
+
+`gh api -X PUT /repos/.../branches/main/protection` で以下を設定:
+- ✅ Required status checks: `Lint (tsc --noEmit)` / `Unit tests (vitest)` / `Firestore Rules tests`
+- ✅ Strict mode（PR が main の最新コミットに up-to-date でないとマージ不可）
+- ✅ `allow_force_pushes: false` / `allow_deletions: false`
+- `enforce_admins: false`（緊急時に owner が bypass 可能、ただし hook で main 直 push は依然ブロック）
+- `required_pull_request_reviews: null`（1 人体制のため reviewer 必須化は今は無し）
+
+### 6. 運用ドキュメント
+
+**`docs/runbooks/ci.md`** 新設:
+- ワークフロー概要図
+- GitHub Secrets の初回登録手順
+- `FIREBASE_TOKEN` ローテーション手順（流出時 / Collaborator 抜けた時 / 半年経過時）
+- Branch protection 推奨設定
+- トラブルシューティング（Java 21、`FIREBASE_TOKEN` 未設定、`auth/invalid-credential`）
+- CI ローカル再現手順
+
+---
+
+## 検証結果（セッション 9）
+
+- ✅ ローカル `pnpm lint` PASS
+- ✅ ローカル `pnpm test` 71/71 PASS
+- ✅ ローカル `pnpm test:rules` 82/82 PASS
+- ✅ GitHub Actions CI（PR #3）3/3 ジョブ PASS
+  - Lint (tsc --noEmit): 16s
+  - Unit tests (vitest): 16s
+  - Firestore Rules tests: 32s
+- ✅ PR #3 マージ完了（merge commit `5371bb2`）
+- ✅ Branch protection 設定反映確認
+
+---
+
+## 重要決定事項（セッション 9 で確定）
+
+### Java バージョンの固定方針
+
+`firebase-tools@latest` を使う限り **Java 21+ を強制**。今後 Java 23 以降が必須になる可能性もあるが、`actions/setup-java@v4` で `java-version: '21'` と明記しているので CI 側は安定。ローカル Docker emulator は `default-jre-headless` (debian bullseye = Java 17) で session 8 までは動いていたが、`firebase-tools@13` を pin しているため動作中。**`firebase-tools` を 14+ に上げる時は emulator Dockerfile も Java 21 に上げる必要がある**。
+
+### CI と本番デプロイの責務分離
+
+- **`ci.yml`**: コード品質ゲート。PR でブロック判定。デプロイしない。
+- **`deploy-rules.yml`**: Rules / indexes 専用の自動デプロイ。SPA (Cloudflare Pages) や Worker のデプロイは別系統（手動 wrangler）。
+
+「コードを CI で検証 → main にマージ → 自動デプロイ」の段階を明示的に分けた。今後 SPA 自動デプロイを追加する場合も同パターンで `deploy-pages.yml` 等を新規追加する想定。
+
+### main 直 push 不可ポリシーの GitHub 側でも担保
+
+ローカル hook で `git push origin main` をブロックしているが、CI トークン経由や別端末からの push に対しては GitHub 側の Branch protection で二重防壁。
+
+---
+
+## 残タスク（次セッション以降）
+
+### 本番運用上の to-do
+
+1. **管理 UI で 2 人目管理者付与の実機確認** — chikuda ログイン → 別ユーザを `管理者` に昇格できるか実機確認
+2. **本番 seed の本格版** — tags / 初期 announcements / changelog の投入（`bootstrap-prod-user.mjs` を雛形として extend）
+3. **`actions/setup-node@v4` 等の Node.js 24 対応** — 2026-09-16 までに対処（CI 警告のみで現状動作）
+
+### MEDIUM 課題（session 5 由来、引き続き）
+
+| # | 内容 |
+|---|---|
+| M1 | FeedbackTab の `alert()` を共通 Toast に統一 |
+| M2 | Sidebar 未読バッジの同期: `useLocation` 依存追加 or storage event |
+| M3 | TanStack Query → 将来 `onSnapshot` 化（複数管理者の同時操作対応） |
+| M4 | `feedback update + admin_logs` を `writeBatch` で原子化 |
+| M5 | 未使用 Firestore index に注記 or 削除（`feedbacks` の status / category 複合） |
+| M6 | バナーのモバイル `@media` 対応 |
+| M7 | localStorage `lastSeen` の改ざん耐性（不正バージョン弾く） |
+
+### 後続フェーズ
+
+- **R2 検討**: 添付・アバター機能を有効化したくなった時の Storage 代替
+- **CI に E2E 追加**（必要なら Playwright + Cloudflare Pages preview deploy）
+
+---
+
+## 次セッションへの注意点（セッション 9 で更新）
+
+### CI トリガ条件の理解
+
+- `ci.yml` は **PR open / synchronize / reopen** + **main への push** で起動。feature ブランチへの push 単独では起動しない（PR が無いと走らない設計）
+- `deploy-rules.yml` は **main への push かつ rules/indexes/firebase.json 変更時のみ**。普通の PR マージでは起動しない（コード変更だけのマージ）
+- **`workflow_dispatch`** で `deploy-rules.yml` を手動実行可能（`gh workflow run deploy-rules.yml`）
+
+### Branch protection bypass
+
+`main` 直 push が必要な緊急時:
+- ローカル hook を一時的に無効化 → push（推奨せず、PR ベース運用を維持）
+- もしくは GitHub Web UI から `enforce_admins: true` を一時 off にして push（要 owner 権限）
+
+### FIREBASE_TOKEN の影響範囲
+
+このトークンは **本番 `aidevknowledge-app` プロジェクトの Owner 相当**:
+- Firestore Rules / indexes デプロイ可能
+- Auth / Storage / Functions の設定変更も可能
+- 失効していなければ別プロジェクトへの誤デプロイも防止できない（`--project` 明示で対策中）
+
+流出時影響大。ローテーション手順は `docs/runbooks/ci.md` を参照。
+
+### CI 実行時間の目安
+
+- 並列 3 ジョブで全体 ~32 秒（最長の rules-test に律速）
+- 月間使用枠（GitHub Free Plan = public repo は無制限）に対しては余裕
+
+---
+
+## 過去セッション
+
+- **session 1-4**: 基本機能（PoC・seed・E2E・auth・URL/Q&A/notes/apps）
+- **session 5**: お知らせ + フィードバック（PR #1）
+- **session 6**: CSS 修正 + Cloudflare Workers 移行 + 本人削除 UI + コードレビュー対応（PR #1, #2）
+- **session 7**: Cloudflare Pages デプロイ → 完全クラウド構成完了
+- **session 8**: 本番 Firestore 立ち上げ（Rules / indexes デプロイ）+ 初期管理者投入
+- **session 9**: GitHub Actions CI 整備（lint/test/test:rules + Rules 自動デプロイ）+ Branch protection
+
+---
+
+## セッション 8 までの内容（archive）
+
+### 今回やったこと（セッション 8）
 
 セッション 7 で立ち上げた本番 Pages を **実運用可能な状態に通電**。承認済みドメイン追加だけで動かないことが判明し、Firestore Rules / indexes が未デプロイ（default deny-all）であることを発見、CI トークン経由でデプロイし、初期管理者を確立した。
 
