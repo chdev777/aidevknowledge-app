@@ -91,6 +91,26 @@ API 経由ではなく Console UI で対応（Service Account 鍵が学院ポリ
 Auth 作成だけでは `users/{uid}` レコードが無いので SPA からは初回サインイン時に bootstrap される（`src/lib/firebase/bootstrap-user.ts`）。
 管理者ロール付与は Console の Firestore エディタから手動で `role: '管理者'` を立てる。
 
+### メール検証ゲートと既存未検証アカウントの処理
+
+session 12 以降、未検証ユーザは Firestore 書込が一切できなくなった（Rules の `verified()` ヘルパで `request.auth.token.email_verified == true` を必須化）。SPA 側も `/verify-email` 待機画面に隔離される。
+
+**Spark プランの制約**: Firebase Console には `emailVerified` フラグを直接トグルする UI がない。Admin SDK が必要だが学院ポリシーでサービスアカウント鍵が生成不可。
+
+そのため、未検証アカウントの扱いは以下のいずれか:
+
+1. **削除して作り直す（推奨・テストアカウント）**: [Authentication → Users](https://console.firebase.google.com/project/aidevknowledge-app/authentication/users) で対象アカウントの ⋮ メニュー → 「ユーザーを削除」。SPA で signup し直して、確認メールのリンクをクリックすれば検証済になる。
+2. **本物のメールで signup → リンクをクリック**: 管理者・本番ユーザの場合はこちら。
+3. **Blaze にアップグレードして Identity Platform Blocking Function を使う**: 課金事故対策の方針上、現状は採用しない。
+
+#### 本番現状（session 12 時点）
+
+| email | role | emailVerified | 推奨対応 |
+|---|---|---|---|
+| `chikuda@j.kobegakuin.ac.jp` | 管理者 | 要確認 | Console で確認、未検証なら本人がリンク再送 |
+| `test2@example.com` | DX推進 | false（推定） | テスト用なので削除推奨。再投入は SPA signup 経由で |
+| `test@example.com` | (users 未 bootstrap) | false（推定） | session 8 以来未使用、削除推奨 |
+
 ### tags マスタ投入（初回のみ）
 
 23 種の初期タグ（`RAG` / `Dify` / `Claude` / `FAQ検索` など）を Firestore に投入。Rules で `tags.write` は管理者のみ許可されているため、管理者ロールのアカウントでログインして REST 経由で投入する。

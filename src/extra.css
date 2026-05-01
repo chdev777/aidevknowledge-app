@@ -170,6 +170,15 @@
 }
 .auth-foot a:hover { text-decoration: underline; }
 .auth-foot .dot { color: var(--ink-4); }
+.auth-foot .link-like {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: var(--accent-ink);
+  cursor: pointer;
+}
+.auth-foot .link-like:hover { text-decoration: underline; }
 
 /* ----- Generic buttons ----- */
 .btn {

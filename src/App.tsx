@@ -5,6 +5,7 @@ import { ErrorBoundary } from './components/shared/ErrorBoundary.js';
 import { LoginPage } from './pages/LoginPage.js';
 import { SignupPage } from './pages/SignupPage.js';
 import { ResetPasswordPage } from './pages/ResetPasswordPage.js';
+import { VerifyEmailPage } from './pages/VerifyEmailPage.js';
 import { RequireAuth } from './components/shell/RequireAuth.js';
 import { AppShell } from './components/shell/AppShell.js';
 import { HomePage } from './pages/HomePage.js';
@@ -47,6 +48,7 @@ export function App() {
               <Route path="/login" element={<LoginPage />} />
               <Route path="/signup" element={<SignupPage />} />
               <Route path="/reset-password" element={<ResetPasswordPage />} />
+              <Route path="/verify-email" element={<VerifyEmailPage />} />
               <Route
                 path="/"
                 element={
