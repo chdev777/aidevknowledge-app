@@ -4,7 +4,14 @@ import {
   assertSucceeds,
   type RulesTestEnvironment,
 } from '@firebase/rules-unit-testing';
-import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import {
+  deleteDoc,
+  doc,
+  getDoc,
+  setDoc,
+  updateDoc,
+  serverTimestamp,
+} from 'firebase/firestore';
 import { authed, makeEnv, seedUser, UIDS } from './helpers.js';
 
 let env: RulesTestEnvironment;
@@ -115,6 +122,57 @@ describe('users rules', () => {
       }),
     );
   });
+
+  it('管理者は他者の users/{uid} を削除できる', async () => {
+    await seedUser(env, UIDS.alice, '管理者');
+    await seedUser(env, UIDS.bob, 'DX推進');
+    const db = authed(env, UIDS.alice).firestore();
+    await assertSucceeds(deleteDoc(doc(db, `users/${UIDS.bob}`)));
+  });
+
+  it('管理者でも自分自身の users/{uid} は削除できない', async () => {
+    await seedUser(env, UIDS.alice, '管理者');
+    const db = authed(env, UIDS.alice).firestore();
+    await assertFails(deleteDoc(doc(db, `users/${UIDS.alice}`)));
+  });
+
+  it('一般ユーザーは他者の users/{uid} を削除できない', async () => {
+    await seedUser(env, UIDS.alice, 'DX推進');
+    await seedUser(env, UIDS.bob, 'DX推進');
+    const db = authed(env, UIDS.alice).firestore();
+    await assertFails(deleteDoc(doc(db, `users/${UIDS.bob}`)));
+  });
+
+  it('管理者は他者の private/profile を削除できる（user 削除のクリーンアップ）', async () => {
+    await seedUser(env, UIDS.alice, '管理者');
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), `users/${UIDS.bob}/private/profile`), {
+        email: 'bob@example.ac.jp',
+      });
+    });
+    const db = authed(env, UIDS.alice).firestore();
+    await assertSucceeds(deleteDoc(doc(db, `users/${UIDS.bob}/private/profile`)));
+  });
+
+  it('本人は自分の private/profile を削除できる', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), `users/${UIDS.alice}/private/profile`), {
+        email: 'alice@example.ac.jp',
+      });
+    });
+    const db = authed(env, UIDS.alice).firestore();
+    await assertSucceeds(deleteDoc(doc(db, `users/${UIDS.alice}/private/profile`)));
+  });
+
+  it('一般ユーザーは他者の private/profile を削除できない', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), `users/${UIDS.bob}/private/profile`), {
+        email: 'bob@example.ac.jp',
+      });
+    });
+    const db = authed(env, UIDS.alice).firestore();
+    await assertFails(deleteDoc(doc(db, `users/${UIDS.bob}/private/profile`)));
+  });
 });
 
 describe('handles rules', () => {
@@ -147,5 +205,42 @@ describe('handles rules', () => {
     });
     const db = authed(env, UIDS.alice).firestore();
     await assertFails(updateDoc(doc(db, 'handles/sato.k'), { uid: UIDS.bob }));
+  });
+
+  it('管理者は handle を削除できる（user 不在時のみ）', async () => {
+    await seedUser(env, UIDS.alice, '管理者');
+    // bob の users/{uid} は seed しない（既に削除済み相当）
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'handles/bob'), {
+        uid: UIDS.bob,
+        createdAt: serverTimestamp(),
+      });
+    });
+    const db = authed(env, UIDS.alice).firestore();
+    await assertSucceeds(deleteDoc(doc(db, 'handles/bob')));
+  });
+
+  it('管理者でも生きているユーザの handle は削除できない（誤削除防止）', async () => {
+    await seedUser(env, UIDS.alice, '管理者');
+    await seedUser(env, UIDS.bob, 'DX推進'); // bob は生きている
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'handles/bob'), {
+        uid: UIDS.bob,
+        createdAt: serverTimestamp(),
+      });
+    });
+    const db = authed(env, UIDS.alice).firestore();
+    await assertFails(deleteDoc(doc(db, 'handles/bob')));
+  });
+
+  it('一般ユーザーは handle を削除できない', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'handles/bob'), {
+        uid: UIDS.bob,
+        createdAt: serverTimestamp(),
+      });
+    });
+    const db = authed(env, UIDS.alice).firestore();
+    await assertFails(deleteDoc(doc(db, 'handles/bob')));
   });
 });

@@ -10,6 +10,7 @@ export const ADMIN_LOG_ACTIONS = [
   'update_tag',
   'delete_tag',
   'set_feedback_status',
+  'delete_user',
 ] as const;
 
 export type AdminLogAction = (typeof ADMIN_LOG_ACTIONS)[number];

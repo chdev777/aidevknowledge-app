@@ -435,6 +435,8 @@
   color: var(--ink-2);
   font-size: 13px;
   line-height: 1.65;
+  /* description 内の \n / \n\n を改行として表示する（HTML デフォルトでは潰れる） */
+  white-space: pre-wrap;
 }
 .modal-footer {
   padding: 14px 22px;
