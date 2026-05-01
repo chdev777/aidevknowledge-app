@@ -25,7 +25,7 @@ function buildCrumbs(pathname: string): string[] {
 }
 
 export function Topbar() {
-  const { profile, fbUser, sendVerification, signOut } = useAuth();
+  const { profile, signOut } = useAuth();
   const loc = useLocation();
   const nav = useNavigate();
   const [params, setParams] = useSearchParams();
@@ -51,16 +51,6 @@ export function Topbar() {
         ))}
       </div>
       <div className="topbar-spacer" />
-      {fbUser && !fbUser.emailVerified && (
-        <button
-          type="button"
-          className="btn ghost sm"
-          onClick={() => sendVerification()}
-          title="確認メールを再送"
-        >
-          <Icon name="refresh" size={12} /> メール未検証
-        </button>
-      )}
       <div className="topbar-actions">
         <button
           type="button"

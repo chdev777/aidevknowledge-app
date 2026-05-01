@@ -11,7 +11,7 @@ import { auth, db } from './client.js';
 import type { User } from '../../types/user.js';
 import { logger } from '../utils/log.js';
 
-export type AuthStatus = 'loading' | 'authed' | 'unauthed' | 'profileMissing';
+export type AuthStatus = 'loading' | 'authed' | 'unauthed' | 'unverified' | 'profileMissing';
 
 export interface AuthState {
   status: AuthStatus;
@@ -20,6 +20,8 @@ export interface AuthState {
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   sendVerification: () => Promise<void>;
+  /** Auth サーバから user を再取得して emailVerified を再評価。検証完了後に呼ぶ。 */
+  recheckVerification: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
 
@@ -41,6 +43,15 @@ async function loadProfile(uid: string): Promise<User | null> {
   };
 }
 
+/**
+ * パスワード認証で email_verified=false の場合のみ「未検証」扱い。
+ * Google/SAML 等の外部 IdP は IdP 側が検証済を保証するため対象外。
+ */
+function isPasswordUnverified(u: FirebaseUser): boolean {
+  if (u.emailVerified) return false;
+  return u.providerData.some((p) => p.providerId === 'password');
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<AuthStatus>('loading');
   const [fbUser, setFbUser] = useState<FirebaseUser | null>(null);
@@ -52,6 +63,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!u) {
         setProfile(null);
         setStatus('unauthed');
+        return;
+      }
+      if (isPasswordUnverified(u)) {
+        setProfile(null);
+        setStatus('unverified');
         return;
       }
       try {
@@ -85,12 +101,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       sendVerification: async () => {
         if (auth.currentUser) await sendEmailVerification(auth.currentUser);
       },
-      refreshProfile: async () => {
-        if (auth.currentUser) {
-          const p = await loadProfile(auth.currentUser.uid);
+      recheckVerification: async () => {
+        const before = auth.currentUser;
+        if (!before) return;
+        await before.reload();
+        // reload は onAuthStateChanged を発火しないので手動で state 更新。
+        // reload 後の最新状態を取り直してから判定する（mutable オブジェクトの stale 参照を避ける）
+        const u = auth.currentUser;
+        if (!u) {
+          setFbUser(null);
+          setProfile(null);
+          setStatus('unauthed');
+          return;
+        }
+        setFbUser(u);
+        if (isPasswordUnverified(u)) {
+          setStatus('unverified');
+          return;
+        }
+        try {
+          const p = await loadProfile(u.uid);
           setProfile(p);
           setStatus(p ? 'authed' : 'profileMissing');
+        } catch (err) {
+          logger.error('failed to load profile', { uid: u.uid, err: String(err) });
+          setStatus('profileMissing');
         }
+      },
+      refreshProfile: async () => {
+        const u = auth.currentUser;
+        if (!u) return;
+        // bootstrap 直後は emailVerified=false。ここで 'authed' を立てるとフラッシュが発生し
+        // onAuthStateChanged が後から 'unverified' で上書きする。先に未検証判定して終了する。
+        if (isPasswordUnverified(u)) {
+          setProfile(null);
+          setStatus('unverified');
+          return;
+        }
+        const p = await loadProfile(u.uid);
+        setProfile(p);
+        setStatus(p ? 'authed' : 'profileMissing');
       },
     }),
     [status, fbUser, profile],

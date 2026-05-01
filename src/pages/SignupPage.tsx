@@ -42,7 +42,9 @@ export function SignupPage() {
         color: '',
       });
       await refreshProfile();
-      navigate('/', { replace: true });
+      // 確認メールをクリックするまでアプリは使えない（auth-context で 'unverified' 状態になる）。
+      // 待機画面へ遷移してメール確認を促す。
+      navigate('/verify-email', { replace: true });
     } catch (err) {
       setError(toAppError(err).userMessage);
     } finally {

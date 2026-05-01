@@ -10,6 +10,15 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    /**
+     * メール検証済か。Firebase Auth のリンクをクリックしたユーザのみ true。
+     * 投稿・編集・削除など書込系の主要パスはここを必須にする。
+     * 例外: bootstrap 経路（users/handles/private の create）と読取系は signedIn() のまま。
+     */
+    function verified() {
+      return signedIn() && request.auth.token.email_verified == true;
+    }
+
     function ownerOf(d) {
       return signedIn() && request.auth.uid == d.createdBy;
     }
@@ -22,9 +31,9 @@ service cloud.firestore {
       return shared(d) || ownerOf(d);
     }
 
-    /** 投稿系コレクション共通の create バリデーション */
+    /** 投稿系コレクション共通の create バリデーション（要メール検証） */
     function commonCreate(d) {
-      return signedIn()
+      return verified()
         && d.createdBy == request.auth.uid
         && d.createdAt == request.time
         && d.visibility in ['private', 'shared']
@@ -42,9 +51,12 @@ service cloud.firestore {
       return d[field] is string && d[field].size() > 0 && d[field].size() <= max;
     }
 
-    /** 呼出元が管理者ロールかどうか（users/{uid}.role を get で確認） */
+    /**
+     * 呼出元が管理者ロールかどうか（users/{uid}.role を get で確認）
+     * 検証済 + role='管理者' を満たす場合のみ true。未検証管理者は admin 権限を持てない。
+     */
     function isAdmin() {
-      return signedIn()
+      return verified()
         && exists(/databases/$(database)/documents/users/$(request.auth.uid))
         && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == '管理者';
     }
@@ -64,9 +76,9 @@ service cloud.firestore {
         && request.resource.data.handle.size() <= 32
         && request.resource.data.handle.matches('^[a-zA-Z0-9_.-]+$');
 
-      // 本人による update（role/handle は不変）
-      // または 管理者による他者の role 変更（handle・他フィールドは触れない）
-      allow update: if signedIn() && (
+      // 本人による update（role/handle は不変、要メール検証）
+      // または 管理者による他者の role 変更（handle・他フィールドは触れない、isAdmin は verified 必須）
+      allow update: if verified() && (
         (
           request.auth.uid == uid
           && request.resource.data.role == resource.data.role
@@ -115,11 +127,11 @@ service cloud.firestore {
         && request.resource.data.userComment.size() <= 2000
         && request.resource.data.summary is string
         && request.resource.data.summary.size() <= 2000;
-      allow update: if ownerOf(resource.data)
+      allow update: if verified() && ownerOf(resource.data)
         && immutableOnUpdate(resource.data, request.resource.data)
         && request.resource.data.tags is list
         && request.resource.data.tags.size() <= 10;
-      allow delete: if ownerOf(resource.data) || isAdmin();
+      allow delete: if verified() && (ownerOf(resource.data) || isAdmin());
     }
 
     match /notes/{id} {
@@ -134,9 +146,9 @@ service cloud.firestore {
         && request.resource.data.result.size() <= 4000
         && request.resource.data.conclusion is string
         && request.resource.data.conclusion.size() <= 2000;
-      allow update: if ownerOf(resource.data)
+      allow update: if verified() && ownerOf(resource.data)
         && immutableOnUpdate(resource.data, request.resource.data);
-      allow delete: if ownerOf(resource.data) || isAdmin();
+      allow delete: if verified() && (ownerOf(resource.data) || isAdmin());
     }
 
     match /apps/{id} {
@@ -154,9 +166,9 @@ service cloud.firestore {
         && request.resource.data.stats.views == 0
         && request.resource.data.stats.comments == 0
         && request.resource.data.stats.likes == 0;
-      allow update: if ownerOf(resource.data)
+      allow update: if verified() && ownerOf(resource.data)
         && immutableOnUpdate(resource.data, request.resource.data);
-      allow delete: if ownerOf(resource.data) || isAdmin();
+      allow delete: if verified() && (ownerOf(resource.data) || isAdmin());
     }
 
     // ========================================
@@ -170,10 +182,10 @@ service cloud.firestore {
         && request.resource.data.body.size() <= 8000
         && request.resource.data.answerCount == 0
         && !('acceptedAnswerId' in request.resource.data);
-      // 質問本人だけが本文編集可能
-      allow update: if ownerOf(resource.data)
+      // 質問本人だけが本文編集可能（要メール検証）
+      allow update: if verified() && ownerOf(resource.data)
         && immutableOnUpdate(resource.data, request.resource.data);
-      allow delete: if ownerOf(resource.data) || isAdmin();
+      allow delete: if verified() && (ownerOf(resource.data) || isAdmin());
 
       // 回答（サブコレクション）
       match /answers/{aid} {
@@ -181,12 +193,12 @@ service cloud.firestore {
           return get(/databases/$(database)/documents/questions/$(id)).data;
         }
         function isQuestionOwner() {
-          return signedIn() && request.auth.uid == parentQuestion().createdBy;
+          return verified() && request.auth.uid == parentQuestion().createdBy;
         }
 
         allow read: if signedIn() && visibleTo(parentQuestion());
 
-        allow create: if signedIn()
+        allow create: if verified()
           && request.resource.data.createdBy == request.auth.uid
           && request.resource.data.createdAt == request.time
           && request.resource.data.body is string
@@ -195,9 +207,9 @@ service cloud.firestore {
           && request.resource.data.votes == 0
           && request.resource.data.accepted == false;
 
-        // update は3パターン：投稿者本文編集 / 質問者の採用変更 / 投票 ±1
+        // update は3パターン：投稿者本文編集 / 質問者の採用変更 / 投票 ±1（全て要検証）
         allow update: if (
-          ownerOf(resource.data)
+          verified() && ownerOf(resource.data)
           && immutableOnUpdate(resource.data, request.resource.data)
           && request.resource.data.votes == resource.data.votes
           && request.resource.data.accepted == resource.data.accepted
@@ -206,7 +218,7 @@ service cloud.firestore {
           && request.resource.data.diff(resource.data).affectedKeys()
               .hasOnly(['accepted', 'updatedAt'])
         ) || (
-          signedIn()
+          verified()
           && request.resource.data.diff(resource.data).affectedKeys()
               .hasOnly(['votes', 'updatedAt'])
           && (
@@ -215,7 +227,7 @@ service cloud.firestore {
           )
         );
 
-        allow delete: if ownerOf(resource.data) || isAdmin();
+        allow delete: if verified() && (ownerOf(resource.data) || isAdmin());
       }
     }
 
@@ -226,7 +238,7 @@ service cloud.firestore {
       allow read: if signedIn()
         && (resource.data.targetVisibility == 'shared' || ownerOf(resource.data));
 
-      allow create: if signedIn()
+      allow create: if verified()
         && request.resource.data.createdBy == request.auth.uid
         && request.resource.data.createdAt == request.time
         && request.resource.data.targetVisibility in ['private', 'shared']
@@ -245,12 +257,12 @@ service cloud.firestore {
         && request.resource.data.body.size() > 0
         && request.resource.data.body.size() <= 2000;
 
-      allow update: if ownerOf(resource.data)
+      allow update: if verified() && ownerOf(resource.data)
         && immutableOnUpdate(resource.data, request.resource.data)
         && request.resource.data.targetType == resource.data.targetType
         && request.resource.data.targetId == resource.data.targetId;
 
-      allow delete: if ownerOf(resource.data) || isAdmin();
+      allow delete: if verified() && (ownerOf(resource.data) || isAdmin());
     }
 
     // ========================================
@@ -305,10 +317,11 @@ service cloud.firestore {
     }
 
     // ========================================
-    // favorites — 本人のみ
+    // favorites — 本人のみ。read は signedIn()、write は要メール検証
     // ========================================
     match /favorites/{uid}/items/{id} {
-      allow read, write: if signedIn() && request.auth.uid == uid;
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow write: if verified() && request.auth.uid == uid;
     }
 
     // ========================================
@@ -321,7 +334,7 @@ service cloud.firestore {
     match /feedbacks/{id} {
       allow read: if isAdmin();
 
-      allow create: if signedIn()
+      allow create: if verified()
         && request.resource.data.createdBy == request.auth.uid
         && request.resource.data.status == 'new'
         && request.resource.data.category in ['bug', 'feature', 'other']

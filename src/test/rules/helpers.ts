@@ -44,6 +44,11 @@ export function authed(env: RulesTestEnvironment, uid: string): RulesTestContext
   return env.authenticatedContext(uid, { email_verified: true });
 }
 
+/** 未検証 (email_verified=false) ユーザのコンテキスト。書込系の主要パスは Rules で拒否されるはず。 */
+export function authedUnverified(env: RulesTestEnvironment, uid: string): RulesTestContext {
+  return env.authenticatedContext(uid, { email_verified: false });
+}
+
 export function unauthed(env: RulesTestEnvironment): RulesTestContext {
   return env.unauthenticatedContext();
 }

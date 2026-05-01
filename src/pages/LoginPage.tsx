@@ -17,11 +17,15 @@ export function LoginPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // 未検証 → /verify-email、検証済 → from or / に遷移（useEffect 一元化で flash 回避）
   useEffect(() => {
-    if (status === 'authed') {
-      navigate('/', { replace: true });
+    if (status === 'unverified') {
+      navigate('/verify-email', { replace: true });
+    } else if (status === 'authed') {
+      const dest = location.state?.from ?? '/';
+      navigate(dest, { replace: true });
     }
-  }, [status, navigate]);
+  }, [status, navigate, location.state]);
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -29,8 +33,7 @@ export function LoginPage() {
     setSubmitting(true);
     try {
       await signIn(email.trim(), password);
-      const dest = location.state?.from ?? '/';
-      navigate(dest, { replace: true });
+      // 遷移は useEffect が status 監視で実施
     } catch (err) {
       setError(toAppError(err).userMessage);
     } finally {
