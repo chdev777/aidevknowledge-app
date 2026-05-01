@@ -22,6 +22,7 @@ const ACTION_LABEL: Record<AdminLogAction, string> = {
   update_tag: 'タグ更新',
   delete_tag: 'タグ削除',
   set_feedback_status: 'フィードバック状態変更',
+  delete_user: 'ユーザー削除',
 };
 
 const FILTERS: { key: ActionFilter; label: string }[] = [

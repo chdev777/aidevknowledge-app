@@ -94,4 +94,17 @@ describe('admin_logs rules', () => {
     await assertFails(updateDoc(doc(db, 'admin_logs/log1'), { reason: 'changed' }));
     await assertFails(deleteDoc(doc(db, 'admin_logs/log1')));
   });
+
+  it('管理者は delete_user action の log を create できる', async () => {
+    await seedUser(env, UIDS.alice, '管理者');
+    const db = authed(env, UIDS.alice).firestore();
+    await assertSucceeds(
+      setDoc(doc(db, 'admin_logs/log_delete_user'), {
+        ...baseLog(UIDS.alice),
+        action: 'delete_user',
+        targetType: 'user',
+        targetId: UIDS.bob,
+      }),
+    );
+  });
 });

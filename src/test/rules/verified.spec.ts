@@ -285,6 +285,61 @@ describe('verified gate', () => {
     });
   });
 
+  describe('削除済みユーザ（verified だが users/{uid} 不在）の書込ブロック', () => {
+    // users/{uid} を seed しないこと自体が「削除済み」状態のシミュレーション。
+    // verified=true な idToken は持っているが activeUser() の exists() で弾かれる。
+
+    it('削除済みユーザは links create できない', async () => {
+      const ctx = authed(env, UIDS.alice); // verified=true, but users/{alice} not seeded
+      await assertFails(setDoc(doc(ctx.firestore(), 'links/l1'), baseLink(UIDS.alice)));
+    });
+
+    it('削除済みユーザは comments create できない', async () => {
+      const ctx = authed(env, UIDS.alice);
+      await assertFails(
+        setDoc(doc(ctx.firestore(), 'comments/c1'), baseComment(UIDS.alice)),
+      );
+    });
+
+    it('削除済みユーザは feedbacks create できない', async () => {
+      const ctx = authed(env, UIDS.alice);
+      await assertFails(
+        setDoc(doc(ctx.firestore(), 'feedbacks/f1'), baseFeedback(UIDS.alice)),
+      );
+    });
+
+    it('削除済みユーザは favorites write できない', async () => {
+      const ctx = authed(env, UIDS.alice);
+      await assertFails(
+        setDoc(doc(ctx.firestore(), `favorites/${UIDS.alice}/items/i1`), {
+          targetType: 'link',
+          targetId: 'l1',
+          createdAt: serverTimestamp(),
+        }),
+      );
+    });
+
+    it('削除済みユーザは自分の過去 link を update できない', async () => {
+      // 過去に投稿した link を seed
+      await env.withSecurityRulesDisabled(async (admin) => {
+        await setDoc(doc(admin.firestore(), 'links/l1'), baseLink(UIDS.alice));
+      });
+      // alice の users/{uid} は seed しない（削除済み）
+      const ctx = authed(env, UIDS.alice);
+      await assertFails(
+        updateDoc(doc(ctx.firestore(), 'links/l1'), { summary: 'edited' }),
+      );
+    });
+
+    it('削除済みユーザは自分の過去 link を delete できない', async () => {
+      await env.withSecurityRulesDisabled(async (admin) => {
+        await setDoc(doc(admin.firestore(), 'links/l1'), baseLink(UIDS.alice));
+      });
+      const ctx = authed(env, UIDS.alice);
+      await assertFails(deleteDoc(doc(ctx.firestore(), 'links/l1')));
+    });
+  });
+
   describe('検証済ユーザは従来通り通過する（regression）', () => {
     beforeEach(async () => {
       await seedUser(env, UIDS.alice);

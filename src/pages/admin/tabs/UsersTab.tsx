@@ -6,6 +6,7 @@ import { Avatar } from '../../../components/shell/Avatar.js';
 import { FilterBar } from '../../../components/shared/FilterBar.js';
 import { Spinner } from '../../../components/shared/Spinner.js';
 import { EmptyState } from '../../../components/shared/EmptyState.js';
+import { ConfirmDialog } from '../../../components/shared/ConfirmDialog.js';
 import { USER_ROLES, type User, type UserRole } from '../../../types/user.js';
 import { logger } from '../../../lib/utils/log.js';
 
@@ -23,6 +24,7 @@ export function UsersTab() {
   const qc = useQueryClient();
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<RoleFilter>('all');
+  const [deleteTarget, setDeleteTarget] = useState<User | null>(null);
 
   const usersQ = useQuery({
     queryKey: ['admin', 'users'],
@@ -63,6 +65,50 @@ export function UsersTab() {
       } else {
         logger.error('failed to set role', { err: String(err) });
         alert('ロール変更に失敗しました。');
+      }
+    },
+  });
+
+  const deleteUser = useMutation({
+    mutationFn: async (user: User) => {
+      // 最後の管理者は削除不可
+      if (user.role === '管理者') {
+        const adminCount = await usersDb.countByRole('管理者');
+        if (adminCount <= 1) {
+          throw new Error('LAST_ADMIN');
+        }
+      }
+      await usersDb.deleteAsAdmin(user.id, user.handle);
+      if (profile) {
+        await adminLogsDb.record(
+          { uid: profile.id, handle: profile.handle },
+          {
+            action: 'delete_user',
+            targetType: 'user',
+            targetId: user.id,
+            targetSnapshot: {
+              handle: user.handle,
+              name: user.name,
+              role: user.role,
+            },
+          },
+        );
+      }
+    },
+    onSuccess: () => {
+      setDeleteTarget(null);
+      qc.invalidateQueries({ queryKey: ['admin', 'users'] });
+      qc.invalidateQueries({ queryKey: ['admin', 'logs'] });
+      alert(
+        'ユーザーを削除しました。\n削除済みユーザはログイン後何も操作できません（Rules でブロック）。\nメアド再利用が必要な場合のみ、Firebase Console で Auth アカウントも別途削除してください。',
+      );
+    },
+    onError: (err) => {
+      if ((err as Error).message === 'LAST_ADMIN') {
+        alert('最後の管理者は削除できません。先に他のユーザーを管理者に昇格させてください。');
+      } else {
+        logger.error('failed to delete user', { err: String(err) });
+        alert('ユーザー削除に失敗しました。');
       }
     },
   });
@@ -110,11 +156,27 @@ export function UsersTab() {
               user={u}
               isSelf={u.id === profile?.id}
               onChangeRole={(nextRole) => setRole.mutate({ user: u, nextRole })}
-              pending={setRole.isPending}
+              onDelete={() => setDeleteTarget(u)}
+              pending={setRole.isPending || deleteUser.isPending}
             />
           ))}
         </div>
       )}
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title="ユーザーを削除"
+        description={
+          deleteTarget
+            ? `${deleteTarget.name}（@${deleteTarget.handle} / ${deleteTarget.role}）の Firestore レコード（users / handles / private profile）を削除します。\n\n削除後、対象ユーザは既発行トークンを持っていても書込が一切できなくなります（Rules でブロック）。投稿済みコンテンツは残ります。\n\nメアド再利用が必要な場合のみ、Firebase Console で Auth アカウントも別途削除してください。\n\n本当に削除しますか？`
+            : ''
+        }
+        confirmLabel="削除する"
+        cancelLabel="キャンセル"
+        destructive
+        onConfirm={() => deleteTarget && deleteUser.mutate(deleteTarget)}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }
@@ -123,11 +185,13 @@ function UserRow({
   user,
   isSelf,
   onChangeRole,
+  onDelete,
   pending,
 }: {
   user: User;
   isSelf: boolean;
   onChangeRole: (next: UserRole) => void;
+  onDelete: () => void;
   pending: boolean;
 }) {
   return (
@@ -152,6 +216,15 @@ function UserRow({
           </option>
         ))}
       </select>
+      <button
+        type="button"
+        className="btn btn-destructive sm"
+        disabled={isSelf || pending}
+        onClick={onDelete}
+        title={isSelf ? '自分自身は削除できません' : 'ユーザーを削除'}
+      >
+        削除
+      </button>
     </div>
   );
 }

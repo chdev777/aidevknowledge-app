@@ -5,7 +5,7 @@ import {
   type RulesTestEnvironment,
 } from '@firebase/rules-unit-testing';
 import { doc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { authed, makeEnv, UIDS } from './helpers.js';
+import { authed, makeEnv, seedUser, UIDS } from './helpers.js';
 
 let env: RulesTestEnvironment;
 
@@ -40,7 +40,13 @@ beforeAll(async () => {
   env = await makeEnv();
 });
 afterAll(async () => env.cleanup());
-beforeEach(async () => env.clearFirestore());
+beforeEach(async () => {
+  await env.clearFirestore();
+  // activeUser() Rule が users/{uid} の存在を要求するため、書込テスト用に seed
+  await seedUser(env, UIDS.alice);
+  await seedUser(env, UIDS.bob);
+  await seedUser(env, UIDS.carol);
+});
 
 describe('answers rules', () => {
   it('回答者は accepted=false で create 可', async () => {
