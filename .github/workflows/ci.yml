@@ -76,11 +76,11 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
 
-      # Firebase Emulator は JVM 上で動く
+      # Firebase Emulator は JVM 上で動く（firebase-tools 最新は Java 21+ 必須）
       - uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '17'
+          java-version: '21'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
