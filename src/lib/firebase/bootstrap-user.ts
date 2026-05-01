@@ -5,7 +5,6 @@ import {
 } from 'firebase/auth';
 import {
   doc,
-  getDoc,
   runTransaction,
   serverTimestamp,
   setDoc,
@@ -36,13 +35,16 @@ function pickColor(handle: string): string {
  * サインアップ時の users / handles / private の作成を順序保証する
  *
  * 1. handle 形式チェック
- * 2. handles/{handle} ロックを read で確認（既存なら abort）
- * 3. createUserWithEmailAndPassword
- * 4. transaction で users/{uid} + handles/{handle} を同時 set
- * 5. private/profile を set（個人情報）
- * 6. メール検証メール送信
+ * 2. createUserWithEmailAndPassword
+ * 3. transaction で users/{uid} + handles/{handle} を同時 set（重複は tx.get で検知）
+ * 4. private/profile を set（個人情報）
+ * 5. メール検証メール送信
  *
  * 失敗時は出来る限りロールバック（Auth account 削除など）
+ *
+ * 注意: 事前の handle 重複チェックは行わない。Rules の `handles/{handle}` は read=signedIn()
+ * のため signUp 前（未認証）に getDoc を呼ぶと permission-denied になる。重複検知は signUp 後の
+ * transaction 内 tx.get に集約している。
  */
 export async function bootstrapUser(input: BootstrapInput): Promise<{ uid: string }> {
   if (!HANDLE_PATTERN.test(input.handle)) {
@@ -55,15 +57,6 @@ export async function bootstrapUser(input: BootstrapInput): Promise<{ uid: strin
     throw new AppError({
       code: 'app/role-not-allowed',
       userMessage: '管理者ロールでの自己登録はできません。',
-    });
-  }
-
-  // 事前 handle 重複チェック（軽量）。本格的なロックは transaction 内で。
-  const handleSnap = await getDoc(doc(db, `handles/${input.handle}`));
-  if (handleSnap.exists()) {
-    throw new AppError({
-      code: 'app/handle-taken',
-      userMessage: 'このハンドル名は既に使われています。',
     });
   }
 
