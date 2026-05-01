@@ -1,99 +1,131 @@
 # セッション引き継ぎノート
 
-> 最終更新: 2026-05-01（セッション 10 / SignupPage パスワード入力ミス防止）
+> 最終更新: 2026-05-01（セッション 11 / 本番運用ハードニング: tags 投入・メール検証ゲート・ユーザー削除）
 > 現在ブランチ: `main`（origin と同期、main 直 push はブロック中）
 > リモート: https://github.com/chdev777/aidevknowledge-app
-> 直近コミット: `2a15a75 Merge pull request #5 from chdev777/feat/signup-password-confirm`
+> 直近コミット: `58867b5 feat(admin): 管理者によるユーザー削除機能 + activeUser ゲートで実質無効化` → merge `f6cdc05`
 
 ---
 
-## 今回やったこと（セッション 10）
+## 今回やったこと（セッション 11）
 
-session 9 で構築した PR ベース運用 + CI を初めて実用したセッション。アカウント作成画面のパスワード入力欄が 1 つしかなく、誤入力するとログイン不能になる問題を解決。**確認入力欄 + 表示トグル** の組み合わせで二重防壁を構築した。
+session 10 までで PR ベース運用と CI が整備された状態から、本番運用上の必須対応 3 つを連続実施した。3 つの PR（#7 / #8 / #9）にまたがる作業。
 
-### 1. 採用方針の検討
+### 1. 本番 tags マスタ投入 + changelog v0.5.0（PR #7 マージ済）
 
-入力ミス防止には複数のアプローチがあったが、AskUserQuestion で 4 案を preview 付きで提示してユーザに選択してもらい **「確認入力欄 + 表示トグル」** を採用:
+- `tools/scripts/seed-prod-tags.mjs` 新設: 管理者 idToken 経由の REST 実装で 23 件の tags を atomic commit
+  - Node 標準ライブラリのみ（`fetch` / `node:fs` / `node:util`）でホスト Node 直実行可
+  - 秘密値は `--password-file` または環境変数 `PROD_ADMIN_PASSWORD` のみ受付（CLI 引数禁止）
+  - dry-run / idempotent upsert
+- `src/lib/data/changelog.ts` に v0.5.0 エントリ 3 件追加（パスワード入力ミス防止 / タグ投入 / CI 強化）
+- 本番投入完了（chikuda アカウントで signIn → atomic commit 23 writes 成功）
+- Cloudflare Pages 再デプロイ → 新バンドルにエントリ反映確認
 
-| 案 | 採否 | 理由 |
-|---|---|---|
-| 確認入力欄 + 表示トグル | ✅ 採用 | 業界標準で堅牢、二重防壁、コピペ問題も可視化で吸収 |
-| 表示トグルのみ | ❌ | ショルダーサーフィン無防備、入力ミス検出が弱い |
-| 確認入力欄のみ（従来型） | ❌ | コピペで両方貼ると確認の意味が無い |
-| 送信前確認ダイアログ | ❌ | ダイアログがうるさい、UX が低い |
+### 2. メール検証ゲート（PR #8 マージ済）
 
-### 2. SignupPage 実装
+「確認メールリンクをクリックする前から全機能が使える」問題を二層防御で解消。
 
-**`src/pages/SignupPage.tsx`** に追加:
-- state: `passwordConfirm` / `showPassword`（共有 toggle 状態）
-- 派生値: `passwordMatch` (>= 8 文字 + 一致) / `passwordMismatch`（実害あり時のみ true）
-- パスワード行に表示トグルボタンを内包（input 右端 absolute、👁 / 🙈 で状態表示）
-- 確認入力欄も同じ表示トグル状態を共有 → 1 個のクリックで両方切替（操作回数最小化）
-- hint メッセージ「✅ 一致しています」/「❌ パスワードが一致しません」を `aria-live="polite"` で実況
-- submit ボタンは `disabled={submitting || !passwordMatch}` でガード
-- `aria-invalid` / `aria-describedby` / `aria-pressed` を付与
+#### Layer 1: クライアント側（auth-context + VerifyEmailPage）
+- `AuthStatus` に `'unverified'` 追加（パスワード認証で `emailVerified=false` の場合のみ判定、外部 IdP は対象外）
+- `VerifyEmailPage` 新設: 「確認した（再読込）」「再送」「サインアウト」ボタン
+- `RequireAuth` / `LoginPage` / `SignupPage` の遷移を unverified 対応に統一
+- `Topbar` の未検証バッジ削除（`'authed'` でしか描画されない dead code）
+- `recheckVerification()` 追加（`user.reload()` 後に `auth.currentUser` を再取得）
+- `refreshProfile()` に検証チェック追加で bootstrap 直後の `'authed'` フラッシュ回避
 
-### 3. CSS 追加（`src/extra.css`）
+#### Layer 2: Firestore Rules
+- `verified()` ヘルパ追加 (`request.auth.token.email_verified == true`)
+- `commonCreate()` と `isAdmin()` を verified 必須化
+- 投稿系（links/notes/apps/questions/answers/comments/feedbacks/favorites）の write を verified に
+- bootstrap 経路（users / handles / private create）は意図的に signedIn() のまま
 
-`.auth-password-row` / `.auth-password-toggle` / `.auth-field-hint` を追加。配色:
-- `is-ng`: `oklch(0.45 0.18 25)`（既存 `.auth-error` と同 hue 25 の赤）
-- `is-ok`: `oklch(0.50 0.13 145)`（緑系、hairline 規約に揃う輝度）
+#### バグ修正
+- `bootstrap-user.ts` の handle 事前重複チェックは未認証 read で常に permission-denied になる既存バグ。`bootstrap-prod-user.mjs` では事前にスキップ済だったが SPA 側に残っていた。削除し、重複検知は signUp 後の transaction `tx.get` に集約。
 
-`globals.css` は編集禁止規約に従い `extra.css` に集約。
+#### 検証
+- chikuda の `emailVerified=true` を `tools/scripts/check-prod-verified.mjs` で確認（ロックアウトリスクなしを事前判定）
+- 本番デプロイ済
 
-### 4. Playwright 検証スクリプト新設
+### 3. 管理者によるユーザー削除 + activeUser ゲート（PR #9 マージ済）
 
-**`tools/scripts/verify-signup-password.mjs`** で 16 シナリオを自動検証:
-- 初期マスク状態 / 表示トグルの共有切替 / 不一致時の赤メッセージ + disabled / 一致時の緑メッセージ + enabled / 空欄時の中立 / aria-pressed 等
+#### 機能
+- 管理 → ユーザー タブの各行に「削除」ボタン + ConfirmDialog
+- `usersDb.deleteAsAdmin(uid, handle)` で 2 段階バッチ削除（users + private を atomic → handles 解放）
+- `admin_logs` に `action: 'delete_user'` で監査記録
+- 自己削除 / 最後の管理者削除 / 生きているユーザの handle 削除をすべて拒否
 
-`pnpm dev` 起動後に `node tools/scripts/verify-signup-password.mjs` で再実行可能。将来 SignupPage を触った際の regression 検出に使える。
+#### activeUser() ゲート（実質無効化の決定打）
+- `verified() && exists(users/{uid})` を要求する `activeUser()` ヘルパ
+- 書込系（commonCreate / answers / comments / feedbacks / favorites / 各 update,delete）を `verified()` → `activeUser()` 置換
+- **削除済みユーザの既発行 idToken（最大 1h 有効）でも書込が一切通らなくなる**
+- 結果として「Auth 先 → Firestore 後」という 2 段階運用順序が不要に。Auth 削除は完全クリーンアップ用途のみ（メアド再利用が必要な時だけ）
 
-### 5. CI 経由でマージ
-
-session 9 で構築した PR ベース運用を初実用:
-1. `feat/signup-password-confirm` ブランチで commit
-2. PR #5 作成 → CI 3 ジョブ全 PASS（Lint 21s / Unit 12s / Rules 37s）
-3. verify スクリプト追加 commit を push → CI 再実行 PASS（再実行 23s/13s/43s）
-4. `gh pr merge --merge --delete-branch` でマージ
-
-セッション 9 の Branch protection（required status checks）が機能していることを実機確認した。
+#### Rules 強化（誤操作防止）
+- `users/{uid}` delete: `isAdmin() && uid != self`
+- `handles/{handle}` delete: `isAdmin() && !exists(users/{resource.data.uid})`（生きているユーザの handle 誤削除を防止）
+- `users/{uid}/private/{docId}`: read,create,update + delete 分割
 
 ---
 
-## 検証結果（セッション 10）
+## 検証結果（セッション 11 累積）
 
 - ✅ ローカル `pnpm lint` PASS
-- ✅ ローカル `pnpm test` 71/71 PASS
-- ✅ ローカル `pnpm test:rules` 82/82 PASS
-- ✅ ローカル `node tools/scripts/verify-signup-password.mjs` 16/16 PASS
-- ✅ GitHub Actions CI（PR #5）3/3 ジョブ PASS（2 回実行とも）
-- ✅ PR #5 マージ完了（merge commit `2a15a75`）
+- ✅ `pnpm test` 71/71 PASS
+- ✅ `pnpm test:rules` **115/115** PASS（session 10 の 82 → 115、+33 ケース）
+- ✅ GitHub Actions CI（PR #7 / #8 / #9）すべて 3/3 ジョブ PASS
+- ✅ 本番 Pages 再デプロイ 3 回（tags / 検証ゲート / 削除機能）
+- ✅ 本番 Rules 自動デプロイ 2 回（PR #8 / #9 のマージで `deploy-rules.yml` 起動）
 
 ---
 
-## 重要決定事項（セッション 10 で確定）
+## 重要決定事項（セッション 11 で確定）
 
-### LoginPage は対象外
+### Auth と Firestore の責務分離
+Spark プランで Admin SDK 鍵が使えない学院ポリシー下では、**Firestore Rules の `activeUser()` で「実質無効化」を達成**するのが現実解。Auth アカウントの削除/無効化は管理 UI から不可だが、Rules で `users/{uid}` 不在を要求すれば書込は一切通らない。
 
-ログインは間違えても再試行できるので UX 重量化のメリットが小さい。表示トグルだけ追加する案もあるが今回は見送り、`LoginPage.tsx` は変更なし。
+これにより:
+- 管理 UI 1 操作で完全な無効化が達成
+- Auth 削除は Console で任意（メアド再利用時のみ）
+- 削除済みユーザの既発行トークン窓を待つ必要なし
 
-### Zod スキーマは新設しない
+### bootstrap 経路の Rules 例外を維持
+`users/{uid}` create / `handles/{handle}` create / `users/{uid}/private/{docId}` create は **意図的に `signedIn()` のまま**（verified を要求しない）。理由: signUp 直後（emailVerified=false）に bootstrap が走るため。
 
-パスワード検証は等値比較のみで Zod の利点（refine / pipe / transform）を活かす場面が無く、HTML5 `minLength={8}` + React state 検証で十分。Firebase Auth 側の検証も二重防壁になる。
+### handle 解放 Rule の制約
+`handles/{handle}` delete は対応する `users/{uid}` の不在を要求。これにより:
+- 同一 writeBatch では中間状態を Rules が見て reject → `deleteAsAdmin` を 2 段階バッチに分割
+- 生きているユーザの handle 誤削除を防止（管理者でも不可）
 
-### React Testing Library は導入しない
+### confirm description の改行表示
+ConfirmDialog の description 内 `\n\n` は HTML デフォルトで潰れるため、`.modal-body` に `white-space: pre-wrap` を追加。重要な destructive 通知が読みやすくなる。
 
-現状 `src/test/unit/` は `*.spec.ts`（環境 `node`）で React component testing 環境は未整備。本タスクのために RTL を導入するのは scope creep。代わりに **Playwright 検証スクリプト** で UI 挙動をカバーする方針を採用。これは既存の `verify-*.mjs` パターンと整合する（`verify-banner-accent.mjs` 等）。
+### 検証メール認証の判定対象
+パスワード認証 (`providerData[0].providerId === 'password'`) のみ未検証扱い。Google/SAML 等の外部 IdP は IdP 側が検証保証するため対象外（将来 SSO 導入時の再評価コメントを `auth-context.tsx` に残してある）。
 
-### ラベル内のボタン配置の懸念
+---
 
-`<label className="auth-field">` の中に `<button>`（toggle）と `<input>` を入れるのは MDN 上 anti-pattern とされている（スクリーンリーダー利用者が input をアクティベートしづらい）が:
-- `<button type="button">` で submit を防止
-- 既存フィールドのラベル構造（implicit label）を破壊しないため統一性優先
-- aria-label / aria-pressed で代替アクセシビリティ確保
-- Playwright 検証で実挙動 PASS 確認済
+## 捨てた選択肢と理由
 
-問題が顕在化したら explicit `<label htmlFor>` 構造への切替を検討。
+### 「Auth 先削除 → Firestore 後削除」の運用順序強制
+- **却下**: 操作者が順序を間違える / Console と SPA を行き来する負担、削除済みトークン窓（最大 1h）が残る
+- **採用**: `activeUser()` で Firestore レベルで強制（Rules 一発で実質無効化）
+
+### Identity Platform Blocking Function で「emailVerified=true でないと signIn 拒否」
+- **却下**: Blaze 必須、本プロジェクトは課金事故対策で Spark 維持の方針
+- **採用**: クライアント側 `'unverified'` 状態 + Rules `verified()` の二層
+
+### handles 事前重複チェックを「セッション継承で先行ログイン中なら通る」と諦めて残す
+- **却下**: 新規ユーザは未認証で signup するためほぼ全員失敗（chikuda が成功したのは別経路の可能性）
+- **採用**: 事前 `getDoc` を完全削除、transaction の `tx.get` で重複検知に集約（`bootstrap-prod-user.mjs` の REST 版と整合）
+
+### 投稿コンテンツ（links / notes / apps / questions / comments）も削除でカスケード
+- **却下**: スコープが大きい、データ消失リスク、誰が消したか責任分界点が不明確
+- **採用**: コンテンツは残置、`createdBy` orphan 参照になる。UI は既存の `author.data && ...` ガードで crash なし。「(削除済みユーザー)」プレースホルダ表示は follow-up 課題
+
+### `users.update` も verified 必須化
+- **検討**: 削除済みユーザが残存トークンで自分のプロフィール更新するリスク
+- **却下**: Firestore は存在しないドキュメントへの updateDoc を NOT_FOUND で先行拒否、Rules まで届かない。重複防御の実益なし
+- **採用**: `verified()` のまま
 
 ---
 
@@ -101,46 +133,61 @@ session 9 で構築した PR ベース運用を初実用:
 
 ### 本番運用上の to-do
 
-1. **管理 UI で 2 人目管理者付与の実機確認** — chikuda ログイン → 別ユーザを `管理者` に昇格できるか実機確認
-2. **本番 seed の本格版** — tags / 初期 announcements / changelog の投入
-3. **`actions/setup-node@v4` 等の Node.js 24 対応** — 2026-09-16 までに対処
+1. **`test2@example.com` / `test@example.com` を管理 UI から削除** — chikuda ログイン → 管理 → ユーザー タブで「削除」（Auth 残置可、メアド再利用しないので）
+2. **`secrets/admin-password.txt` の削除徹底** — 一時用途で再作成したため
+3. **`actions/setup-node@v4` 等の Node.js 24 対応** — 2026-09-16 までに対処（CI 警告のみ）
 4. **`FIREBASE_TOKEN` の半年ローテーション** — 目安 2026-11-01
 
+### コードレビューで後追いに回した課題
+
+| # | 内容 | 由来 |
+|---|---|---|
+| H1 | 確認メール再送のクライアント側レート制限（60s クールダウン） | session 11 PR #8 review |
+| H2 | `recheckVerification` と `onAuthStateChanged` の集約リファクタ | 同上 |
+| H3 | 「最後の管理者」削除の TOCTOU（Rules で COUNT 不可、運用注意で受容） | PR #9 review |
+| H4 | orphan `createdBy` 表示の UX 改善（「(削除済みユーザー)」プレースホルダ） | PR #9 review |
+| M1 | 管理 UI の `alert()` を Toast に統一（既存負債と同パターン） | 複数セッション横断 |
+| M2 | `admin_logs` 記録と削除/更新の non-atomic（既存負債） | 同上 |
+| M3 | UsersTab を `useDeleteUser.ts` / `useSetRole.ts` に分割 | PR #9 review |
+| M4 | handle squatting 抑制（未検証ユーザでも handle 取れる現状） | PR #8 review |
+
 ### MEDIUM 課題（session 5 由来、引き続き）
 
 | # | 内容 |
 |---|---|
-| M1 | FeedbackTab の `alert()` を共通 Toast に統一 |
-| M2 | Sidebar 未読バッジの同期: `useLocation` 依存追加 or storage event |
-| M3 | TanStack Query → 将来 `onSnapshot` 化（複数管理者の同時操作対応） |
-| M4 | `feedback update + admin_logs` を `writeBatch` で原子化 |
-| M5 | 未使用 Firestore index に注記 or 削除（`feedbacks` の status / category 複合） |
-| M6 | バナーのモバイル `@media` 対応 |
-| M7 | localStorage `lastSeen` の改ざん耐性（不正バージョン弾く） |
+| M5 | FeedbackTab の `alert()` を共通 Toast に統一 |
+| M6 | Sidebar 未読バッジの同期: `useLocation` 依存追加 or storage event |
+| M7 | TanStack Query → 将来 `onSnapshot` 化（複数管理者の同時操作対応） |
+| M8 | `feedback update + admin_logs` を `writeBatch` で原子化 |
+| M9 | 未使用 Firestore index に注記 or 削除（`feedbacks` の status / category 複合） |
+| M10 | バナーのモバイル `@media` 対応 |
+| M11 | localStorage `lastSeen` の改ざん耐性（不正バージョン弾く） |
 
 ### 後続フェーズ
 
 - **R2 検討**: 添付・アバター機能を有効化したくなった時の Storage 代替
-- **CI に E2E 追加**（`verify-*.mjs` 群を Playwright Test に集約してジョブ化、PR で UI regression 検出）
+- **CI に E2E 追加**（`verify-*.mjs` 群を Playwright Test に集約）
 
 ---
 
-## 次セッションへの注意点（セッション 10 で更新）
+## 次セッションへの注意点（セッション 11 で更新）
 
-### 検証スクリプトの活用パターン
+### 削除済みユーザの動作確認方法
+1. dev で seed → サインイン → 管理 → 自分以外を削除
+2. 削除されたユーザのブラウザ（別シークレット窓）でリロード → ログインしても `'profileMissing'` 画面に隔離される
+3. 既発行トークンで Firestore 書込を試そうとしても全部 permission-denied
 
-`tools/scripts/verify-*.mjs` は Playwright で UI を直接叩く小規模 E2E。`pnpm dev` 起動済前提:
-```bash
-docker compose up -d
-docker compose exec app pnpm dev   # 別シェル or background
-node tools/scripts/verify-signup-password.mjs
-```
+### Rules テストの seedUser 必須化
+`activeUser()` の `exists(users/{uid})` 要件により、書込系を試行する Rules テストはすべて `seedUser(env, UIDS.alice)` を beforeEach で必要とする。`comments.spec.ts` / `answers.spec.ts` / `feedbacks.spec.ts` / `favorites-tags.spec.ts` / `links.spec.ts` の beforeEach に追加済。新規 spec 追加時は同パターンに揃えること。
 
-**現状 CI には組み込まれていない**（dev server 起動が必要なため）。将来 GitHub Actions に組み込む場合は `pnpm preview` または静的ビルド + `serve` 経由が候補。
+### 本番初期管理者の検証状態確認
+`tools/scripts/check-prod-verified.mjs` で `accounts:lookup` を REST 経由で実行可能。メール検証ゲート系の Rules を変更する前のロックアウトリスク事前判定に使う。
 
-### SignupPage の他画面への波及確認
+### handle 削除の制約
+管理 UI 経由の `deleteAsAdmin` は段階1 (users + private) → 段階2 (handles) の順で 2 バッチ実行する必要がある。同一 writeBatch にまとめると Rules が中間状態（user は消えていないのに handle 削除しようとしている）を見て reject する。
 
-このセッションでは `LoginPage.tsx` は意図的に変更していない。もし「ログインも表示トグル欲しい」という要望が出たら、`SignupPage.tsx` の toggle ボタン部分をそのまま流用可能（ただし `LoginPage` の input にも `.auth-password-row` ラッパが必要）。
+### 確認メール送信先の現実
+本番の `test2@example.com` 等は実在しないメアドのため、確認メールリンクをクリックできない（届かない）。テストは実在メアドで行うか、Console の Authentication でユーザを直接管理するしかない。
 
 ---
 
@@ -151,678 +198,26 @@ node tools/scripts/verify-signup-password.mjs
 - **session 6**: CSS 修正 + Cloudflare Workers 移行 + 本人削除 UI + コードレビュー対応（PR #1, #2）
 - **session 7**: Cloudflare Pages デプロイ → 完全クラウド構成完了
 - **session 8**: 本番 Firestore 立ち上げ（Rules / indexes デプロイ）+ 初期管理者投入
-- **session 9**: GitHub Actions CI 整備 + Branch protection
-- **session 10**: SignupPage パスワード入力ミス防止（確認入力欄 + 表示トグル）
+- **session 9**: GitHub Actions CI 整備 + Branch protection（PR #3）
+- **session 10**: SignupPage パスワード入力ミス防止 - 確認入力欄 + 表示トグル（PR #5）
+- **session 11**: 本番 tags 投入 + メール検証ゲート + 管理者ユーザー削除 + activeUser ゲート（PR #7 / #8 / #9）
 
 ---
 
-## セッション 9 までの内容（archive）
-
-### 今回やったこと（セッション 9）
-
-session 8 で残タスクとして挙がっていた **CI 整備** を実施。GitHub Actions で `lint` / `unit-test` / `rules-test` の自動チェック + `firestore.rules` / `firestore.indexes.json` の自動デプロイを構築し、Branch protection も設定した。
-
-### 1. GitHub Actions ワークフロー新設
-
-**`.github/workflows/ci.yml`**: PR open / push to main で 3 ジョブ並列実行
-- `lint`: `pnpm lint`（tsc --noEmit）
-- `unit-test`: `pnpm test`（vitest）
-- `rules-test`: `firebase emulators:exec` で Firestore Emulator をラップして `pnpm test:rules`
-- `concurrency:` で同一ブランチの古い run はキャンセル
-
-**`.github/workflows/deploy-rules.yml`**: `main` への push で `firestore.rules` / `firestore.indexes.json` / `firebase.json` 変更時のみ起動
-- デプロイ前に Rules テスト再実行（最終防壁）
-- `firebase deploy --only firestore:rules,firestore:indexes` を `FIREBASE_TOKEN` で認証
-- `paths:` フィルタにより通常コード変更ではトリガされない（コスト・誤デプロイ抑止）
-- `workflow_dispatch` で緊急時の手動実行も可能
-
-### 2. GitHub Secrets 登録
-
-`secrets/firebase-ci-token.txt`（session 8 で取得済の CI トークン）を `FIREBASE_TOKEN` 名で登録:
-
-```bash
-gh secret set FIREBASE_TOKEN --body "$(cat secrets/firebase-ci-token.txt)"
-```
-
-### 3. Java バージョン要件の罠
-
-初回 CI 実行で `firebase emulators:exec` が以下のエラーで失敗:
-
-```
-Error: firebase-tools no longer supports Java version before 21.
-Please install a JDK at version 21 or above to get a compatible runtime.
-```
-
-**原因**: 最新の `firebase-tools` (v14+) は **Java 21 以上必須** に変更されていた（以前は Java 11+）。`actions/setup-java@v4` の `java-version: '17'` を `'21'` に修正して解決。両ワークフローに反映。
-
-### 4. PR ベース運用への移行
-
-main 直 push が hook でブロックされたため、`feat/ci-and-pending-work` ブランチを切って **PR #3** で session 6/7/8/9 の蓄積コミット 6 個（CI 修正コミット含む）を一括 push。CI が PR 上で 3 ジョブ全 PASS（Lint 16s / Unit 16s / Rules 32s）したことを確認後、`gh pr merge --merge --delete-branch` でマージ。
-
-### 5. Branch protection 設定
-
-`gh api -X PUT /repos/.../branches/main/protection` で以下を設定:
-- ✅ Required status checks: `Lint (tsc --noEmit)` / `Unit tests (vitest)` / `Firestore Rules tests`
-- ✅ Strict mode（PR が main の最新コミットに up-to-date でないとマージ不可）
-- ✅ `allow_force_pushes: false` / `allow_deletions: false`
-- `enforce_admins: false`（緊急時に owner が bypass 可能、ただし hook で main 直 push は依然ブロック）
-- `required_pull_request_reviews: null`（1 人体制のため reviewer 必須化は今は無し）
-
-### 6. 運用ドキュメント
-
-**`docs/runbooks/ci.md`** 新設:
-- ワークフロー概要図
-- GitHub Secrets の初回登録手順
-- `FIREBASE_TOKEN` ローテーション手順（流出時 / Collaborator 抜けた時 / 半年経過時）
-- Branch protection 推奨設定
-- トラブルシューティング（Java 21、`FIREBASE_TOKEN` 未設定、`auth/invalid-credential`）
-- CI ローカル再現手順
-
----
-
-## 検証結果（セッション 9）
-
-- ✅ ローカル `pnpm lint` PASS
-- ✅ ローカル `pnpm test` 71/71 PASS
-- ✅ ローカル `pnpm test:rules` 82/82 PASS
-- ✅ GitHub Actions CI（PR #3）3/3 ジョブ PASS
-  - Lint (tsc --noEmit): 16s
-  - Unit tests (vitest): 16s
-  - Firestore Rules tests: 32s
-- ✅ PR #3 マージ完了（merge commit `5371bb2`）
-- ✅ Branch protection 設定反映確認
-
----
-
-## 重要決定事項（セッション 9 で確定）
-
-### Java バージョンの固定方針
-
-`firebase-tools@latest` を使う限り **Java 21+ を強制**。今後 Java 23 以降が必須になる可能性もあるが、`actions/setup-java@v4` で `java-version: '21'` と明記しているので CI 側は安定。ローカル Docker emulator は `default-jre-headless` (debian bullseye = Java 17) で session 8 までは動いていたが、`firebase-tools@13` を pin しているため動作中。**`firebase-tools` を 14+ に上げる時は emulator Dockerfile も Java 21 に上げる必要がある**。
-
-### CI と本番デプロイの責務分離
-
-- **`ci.yml`**: コード品質ゲート。PR でブロック判定。デプロイしない。
-- **`deploy-rules.yml`**: Rules / indexes 専用の自動デプロイ。SPA (Cloudflare Pages) や Worker のデプロイは別系統（手動 wrangler）。
-
-「コードを CI で検証 → main にマージ → 自動デプロイ」の段階を明示的に分けた。今後 SPA 自動デプロイを追加する場合も同パターンで `deploy-pages.yml` 等を新規追加する想定。
-
-### main 直 push 不可ポリシーの GitHub 側でも担保
-
-ローカル hook で `git push origin main` をブロックしているが、CI トークン経由や別端末からの push に対しては GitHub 側の Branch protection で二重防壁。
-
----
-
-## 残タスク（次セッション以降）
-
-### 本番運用上の to-do
-
-1. **管理 UI で 2 人目管理者付与の実機確認** — chikuda ログイン → 別ユーザを `管理者` に昇格できるか実機確認
-2. **本番 seed の本格版** — tags / 初期 announcements / changelog の投入（`bootstrap-prod-user.mjs` を雛形として extend）
-3. **`actions/setup-node@v4` 等の Node.js 24 対応** — 2026-09-16 までに対処（CI 警告のみで現状動作）
-
-### MEDIUM 課題（session 5 由来、引き続き）
-
-| # | 内容 |
-|---|---|
-| M1 | FeedbackTab の `alert()` を共通 Toast に統一 |
-| M2 | Sidebar 未読バッジの同期: `useLocation` 依存追加 or storage event |
-| M3 | TanStack Query → 将来 `onSnapshot` 化（複数管理者の同時操作対応） |
-| M4 | `feedback update + admin_logs` を `writeBatch` で原子化 |
-| M5 | 未使用 Firestore index に注記 or 削除（`feedbacks` の status / category 複合） |
-| M6 | バナーのモバイル `@media` 対応 |
-| M7 | localStorage `lastSeen` の改ざん耐性（不正バージョン弾く） |
-
-### 後続フェーズ
-
-- **R2 検討**: 添付・アバター機能を有効化したくなった時の Storage 代替
-- **CI に E2E 追加**（必要なら Playwright + Cloudflare Pages preview deploy）
-
----
-
-## 次セッションへの注意点（セッション 9 で更新）
-
-### CI トリガ条件の理解
-
-- `ci.yml` は **PR open / synchronize / reopen** + **main への push** で起動。feature ブランチへの push 単独では起動しない（PR が無いと走らない設計）
-- `deploy-rules.yml` は **main への push かつ rules/indexes/firebase.json 変更時のみ**。普通の PR マージでは起動しない（コード変更だけのマージ）
-- **`workflow_dispatch`** で `deploy-rules.yml` を手動実行可能（`gh workflow run deploy-rules.yml`）
-
-### Branch protection bypass
-
-`main` 直 push が必要な緊急時:
-- ローカル hook を一時的に無効化 → push（推奨せず、PR ベース運用を維持）
-- もしくは GitHub Web UI から `enforce_admins: true` を一時 off にして push（要 owner 権限）
-
-### FIREBASE_TOKEN の影響範囲
-
-このトークンは **本番 `aidevknowledge-app` プロジェクトの Owner 相当**:
-- Firestore Rules / indexes デプロイ可能
-- Auth / Storage / Functions の設定変更も可能
-- 失効していなければ別プロジェクトへの誤デプロイも防止できない（`--project` 明示で対策中）
-
-流出時影響大。ローテーション手順は `docs/runbooks/ci.md` を参照。
-
-### CI 実行時間の目安
-
-- 並列 3 ジョブで全体 ~32 秒（最長の rules-test に律速）
-- 月間使用枠（GitHub Free Plan = public repo は無制限）に対しては余裕
-
----
-
-## 過去セッション（session 9 視点・archive）
-
-- **session 1-4**: 基本機能（PoC・seed・E2E・auth・URL/Q&A/notes/apps）
-- **session 5**: お知らせ + フィードバック（PR #1）
-- **session 6**: CSS 修正 + Cloudflare Workers 移行 + 本人削除 UI + コードレビュー対応（PR #1, #2）
-- **session 7**: Cloudflare Pages デプロイ → 完全クラウド構成完了
-- **session 8**: 本番 Firestore 立ち上げ（Rules / indexes デプロイ）+ 初期管理者投入
-- **session 9**: GitHub Actions CI 整備（lint/test/test:rules + Rules 自動デプロイ）+ Branch protection
-
----
-
-## セッション 8 までの内容（archive）
-
-### 今回やったこと（セッション 8）
-
-セッション 7 で立ち上げた本番 Pages を **実運用可能な状態に通電**。承認済みドメイン追加だけで動かないことが判明し、Firestore Rules / indexes が未デプロイ（default deny-all）であることを発見、CI トークン経由でデプロイし、初期管理者を確立した。
-
-### 1. 承認済みドメイン追加（ユーザ手動）
-
-[Firebase Console → Authentication → Settings → 承認済みドメイン](https://console.firebase.google.com/project/aidevknowledge-app/authentication/settings) に `aidev-knowledge-hub.pages.dev` を追加。これだけで signIn は通るが、後続の Firestore アクセスが 403 PERMISSION_DENIED で全て失敗。
-
-### 2. 本番 Firestore Rules / indexes デプロイ
-
-**症状**: signIn 成功するが `tags` `users` などすべての read/write が 403。
-**原因**: 本番 Firestore は Spark の **default deny-all** ルールのまま。`firestore.rules` がデプロイされていなかった（PoC は Emulator 経由で開発、本番反映ステップが未実施だった）。
-
-**対応**:
-- `firebase login:ci --no-localhost` で CI トークン取得（host のローカル loopback が Docker から見えないため `--no-localhost`）
-- トークンは `secrets/firebase-ci-token.txt`（gitignore 済）に保存、user-visible 出力には貼らない運用
-- `pnpm dlx firebase-tools@latest deploy --only firestore:rules,firestore:indexes --project aidevknowledge-app` で本番反映
-- ローカル `pnpm test:rules` 82/82 PASS 済の状態をそのまま反映
-
-### 3. 本番 signIn / 認可 検証スクリプト
-
-**`tools/scripts/verify-prod-signin.mjs`** 新設:
-- `signInWithPassword` に `Origin: https://aidev-knowledge-hub.pages.dev` を付けて `auth/unauthorized-domain` が出ないこと確認
-- 取得した idToken で Firestore REST に当たり、`tags` を read してルール反映確認
-- `users/{uid}` の bootstrap 状態判定
-- 秘密値は `mask()`（先頭4 + 末尾2 + len）形式で出力、idToken / API key 全文は伏せる
-
-### 4. 本番初期ユーザ投入スクリプト
-
-**`tools/scripts/bootstrap-prod-user.mjs`** 新設。SignupPage の `bootstrapUser()` SDK 動線を REST で完全再現:
-
-1. `accounts:signUp` → uid + idToken 取得（createUserWithEmailAndPassword 相当）
-2. `accounts:update` → displayName 設定
-3. `handles/{handle}` 重複チェック
-4. Firestore `:commit` で `handles/{handle}` + `users/{uid}` を **atomic write**（runTransaction 相当、`currentDocument.exists=false` で既存ドキュメント弾き）
-5. `users/{uid}/private/profile` を PATCH（個人情報、本人のみ書込可）
-6. `accounts:sendOobCode` で確認メール送信（失敗無視）
-
-失敗時は `accounts:delete` で Auth ロールバック。Rules はそのまま適用される（idToken Bearer 認証で `request.auth.uid` 検証）。
-
-これで `test2@example.com` (handle=`test2`, role=`DX推進`) を本番に投入し、bootstrap 経路の機能確認も完了。
-
-### 5. 初期管理者の確立（chikuda）
-
-**chicken-and-egg 問題**: Rules で role='管理者' は `isAdmin()` 経由でしか書き換え不可、しかし管理者ゼロ状態。Rules を bypass できる経路は限定:
-
-| 経路 | 可否 |
-|---|---|
-| Service Account 鍵 + Admin SDK | ❌ 学院 Workspace ポリシーで鍵生成不可 |
-| CI refresh token → OAuth access token 手動交換で IAM bypass | ❌ メモリ規則「秘密値の用途外利用」で hook ブロック（妥当判断） |
-| Firebase Console UI（GCP Owner セッション） | ✅ |
-
-**結論**: Console UI が唯一の正規ルート。chikuda は SPA signup 経由で `users/jQjTsDq…` (handle=`chdev`, role=`情報支援`) と `handles/chdev` が既存だったため、Console の Firestore エディタで `role` 1 フィールドを `情報支援` → `管理者` に書き換えて完了。
-
-test2 idToken で再 read して `role: 管理者` 反映を確認。
-
----
-
-## 検証結果（セッション 8）
-
-- ✅ `pnpm lint`（tsc）PASS
-- ✅ `pnpm test`（unit）71/71 PASS
-- ✅ `pnpm test:rules` 82/82 PASS
-- ✅ `pnpm build:prod` 成功
-- ✅ `verify-cf-pages.mjs` 7/7 PASS
-- ✅ `verify-prod-signin.mjs` PASS（test2 で signIn → Firestore auth → users/{uid} 確認）
-- ✅ `bootstrap-prod-user.mjs` PASS（test2 投入、6 ステップすべて成功）
-- ✅ chikuda の本番 role=管理者 反映確認
-
----
-
-## 重要決定事項（セッション 8 で確定）
-
-### 本番 Rules / indexes デプロイは CI トークン経由で運用
-
-- Service Account 鍵が学院ポリシーで生成不可なので `firebase login:ci` 一択
-- トークンは `secrets/firebase-ci-token.txt`（gitignore 済）。流出時は本番 Owner 権限相当の影響、ローテーション要
-- 将来 SA 鍵が解禁されたら GitHub Actions OIDC + Workload Identity Federation に移行候補
-
-### 「最初の管理者」は Console UI 一択
-
-- REST + Rules では原理的に作成不可（chicken-and-egg）
-- 既存管理者からの role 付与は Rules で許可されている（`isAdmin() && role in ['DX推進','情報支援','管理者']`）
-- 2 人目以降は管理 UI（Moderation など）経由で運用可能
-
-### 秘密値の取り扱い
-
-- chikuda パスワードは結局未使用（ユーザが自身で SPA signup 済だった）。`secrets/chikuda-password.txt` は作成されなかった
-- `secrets/firebase-ci-token.txt` は今後の Rules 更新デプロイで継続利用
-- `bootstrap-prod-user.mjs` のような script では mask 出力を必ず通す（メモリ `feedback_secrets_in_output.md` 準拠）
-
----
-
-## 残タスク（次セッション以降）
-
-### 本番運用上の to-do
-
-1. **`secrets/firebase-ci-token.txt` の保護徹底** — 流出時影響大、ローテーション手順を runbook に追加するのが望ましい
-2. **本番 seed の本格版** — tags / 初期 announcements / changelog の投入スクリプト（`bootstrap-prod-user.mjs` を雛形として extend）
-3. **CI 整備** — GitHub Actions で `pnpm lint` + `pnpm test` + `pnpm test:rules` 必須、Rules / indexes も branch ごとに `firebase deploy` 自動化（CI トークンを GitHub Secrets に格納）
-4. **管理 UI で 2 人目管理者の付与確認** — chikuda ログイン → 管理画面で別ユーザを `管理者` 化できるか実機確認
-
-### MEDIUM 課題（session 5 由来、引き続き）
-
-| # | 内容 |
-|---|---|
-| M1 | FeedbackTab の `alert()` を共通 Toast に統一 |
-| M2 | Sidebar 未読バッジの同期: `useLocation` 依存追加 or storage event |
-| M3 | TanStack Query → 将来 `onSnapshot` 化（複数管理者の同時操作対応） |
-| M4 | `feedback update + admin_logs` を `writeBatch` で原子化 |
-| M5 | 未使用 Firestore index に注記 or 削除（`feedbacks` の status / category 複合） |
-| M6 | バナーのモバイル `@media` 対応 |
-| M7 | localStorage `lastSeen` の改ざん耐性（不正バージョン弾く） |
-
-### 後続フェーズ
-
-- **CI 整備**（再掲）
-- **R2 検討**: 添付・アバター機能を有効化したくなった時の Storage 代替
-
----
-
-## 次セッションへの注意点（セッション 8 で更新）
-
-### 本番テストアカウント
-
-| email | password | role | 用途 |
-|---|---|---|---|
-| `chikuda@j.kobegakuin.ac.jp` | (本人管理) | **管理者** | 管理 UI 動作確認・運用 |
-| `test2@example.com` | `testtest123` | DX推進 | bootstrap 検証用、削除可（不要なら Console から） |
-| `test@example.com` | `testtest123` | (users/{uid} 無し) | Auth のみ存在、users 未 bootstrap、削除推奨 |
-
-### 本番 Firestore 状態
-
-- Rules: 最新 `firestore.rules` (commit `93aa094` 時点) デプロイ済
-- indexes: `firestore.indexes.json` 反映済（バックグラウンド構築完了）
-- データ: `users` 2 件（chikuda, test2）/ `handles` 2 件（chdev, test2）/ その他コレクション空
-
-### 本番デプロイの再実行コマンド
-
-```bash
-TOKEN=$(cat secrets/firebase-ci-token.txt)
-docker compose exec -T -e FIREBASE_TOKEN="$TOKEN" app sh -c \
-  "cd /app && pnpm dlx firebase-tools@latest deploy --only firestore:rules,firestore:indexes --project aidevknowledge-app"
-```
-
-Pages 再デプロイ:
-```bash
-pnpm build:prod
-docker compose exec -T -e CLOUDFLARE_API_TOKEN="$CF_TOKEN" app sh -c \
-  "cd /app/cloudflare/og-worker && pnpm exec wrangler pages deploy ../../dist --project-name=aidev-knowledge-hub --branch=main"
-```
-
----
-
-## 過去セッション
-
-- **session 1-4**: 基本機能（PoC・seed・E2E・auth・URL/Q&A/notes/apps）
-- **session 5**: お知らせ + フィードバック（PR #1）
-- **session 6**: CSS 修正 + Cloudflare Workers 移行 + 本人削除 UI + コードレビュー対応（PR #1, #2）
-- **session 7**: Cloudflare Pages デプロイ → 完全クラウド構成完了
-- **session 8**: 本番 Firestore 立ち上げ（Rules / indexes デプロイ）+ 初期管理者投入
-
----
-
-## セッション 7 までの内容（archive）
-
-### 今回やったこと（セッション 7）
-
-SPA を **Cloudflare Pages** にデプロイし、完全クラウド構成 (Pages + Workers + Firebase Spark) を完成させた。
-
-### 1. Cloudflare Pages デプロイ基盤
-
-- **`public/_headers`** 新設: `firebase.json` hosting.headers の CSP / セキュリティヘッダを Cloudflare Pages 形式に移植。`connect-src` に Worker URL (`aidev-og-worker.ipc-claudeapps001.workers.dev`) を追加。`/assets/*` 用に `Cache-Control: public, max-age=31536000, immutable`。
-- **`public/_redirects`** 新設: SPA history fallback (`/* /index.html 200`)。
-- **`src/test/unit/pages-headers.spec.ts`** TDD で先に書いた検証 9 ケース（CSP の Worker URL / frame-ancestors / script-src 厳格 / セキュリティヘッダ存在）。
-
-### 2. 本番ビルドの env 解決問題を修正
-
-`pnpm build --mode production` で Vite が `aidev-knowledge-dev`（開発用 project ID）を焼き付けてしまっていた。原因は **docker-compose の `env_file: - .env` で VITE_* が container env に注入され、Vite の loadEnv が process.env を上書きしないため**。
-
-→ `tools/scripts/build-prod.sh` を新設。ビルド前に `unset $VITE_*` してから `vite build --mode production` を呼ぶ。`pnpm build:prod` で実行可能。`.env.production.local` 不在ガードあり。
-
-### 3. デプロイスクリプト
-
-- **`tools/scripts/deploy-pages.sh`**: `production` / `preview` / `--dry-run` の 3 モード。`build:prod` → `wrangler pages deploy dist` を一発実行。
-- 初回プロジェクト作成は `wrangler pages project create aidev-knowledge-hub --production-branch=main` を runbook に記載。
-
-### 4. 実デプロイ完了
-
-- **本番 URL**: `https://aidev-knowledge-hub.pages.dev`
-- アップロード 8 ファイル（index.html / `_headers` / `_redirects` / assets 5）
-- レスポンスヘッダで CSP / HSTS / X-Frame-Options 全部 OK
-
-### 5. Worker 設定更新
-
-`cloudflare/og-worker/wrangler.toml` の `ALLOWED_ORIGINS` を `aidev-knowledge.pages.dev`（古い想定 URL）→ `aidev-knowledge-hub.pages.dev`（実 URL）に修正、`wrangler deploy` で再デプロイ。
-
-### 6. E2E 検証スクリプト
-
-**`tools/scripts/verify-cf-pages.mjs`** を新設、7 項目を確認:
-
-1. ルート 200 + index.html
-2. セキュリティヘッダ 6 種すべて適用
-3. CSP に Worker URL
-4. SPA fallback (deep link → index.html 200)
-5. `/assets/*` の immutable cache
-6. Worker CORS preflight が Pages origin から 通過 (`access-control-allow-origin: https://aidev-knowledge-hub.pages.dev`)
-7. Worker `/health` 200
-
-→ **全 PASS**。
-
-### 7. ドキュメント
-
-- **`docs/runbooks/prod-deploy.md`** 新設: 初回プロジェクト作成 / 通常デプロイ / Worker デプロイ / Firebase Console 手動作業（承認済みドメイン追加・テストユーザー作成）/ 検証 / ロールバック手順を網羅。
-
----
-
-## 検証結果（セッション 7）
-
-- ✅ `pnpm lint`（tsc）PASS
-- ✅ `pnpm test`（unit）71/71 PASS（pages-headers 9 ケース追加）
-- ✅ `pnpm test:rules` 82/82 PASS
-- ✅ `pnpm build:prod` 成功（gzip JS = 263 KiB / CSS = 10.5 KiB）
-- ✅ Worker 再デプロイ成功（145 KiB / 15ms 起動）
-- ✅ `verify-cf-pages.mjs` 7/7 PASS
-- ✅ Pages 本番 URL からトップページ取得 / SPA deep link 200 / immutable cache 確認
-
----
-
-## 残タスク（次セッション以降）
-
-### Firebase Console 手動作業（**まだ未実施**、本番ログイン前に必須）
-
-1. [Authentication → Settings → 承認済みドメイン](https://console.firebase.google.com/project/aidevknowledge-app/authentication/settings) に `aidev-knowledge-hub.pages.dev` を追加
-2. テストユーザーで本番 SPA に signIn → users/{uid} bootstrap が走るか実機確認
-
-未対応だと `auth/unauthorized-domain` で signIn 失敗するので最優先。
-
-### MEDIUM 課題（session 5 由来、引き続き）
-
-| # | 内容 |
-|---|---|
-| M1 | FeedbackTab の `alert()` を共通 Toast に統一 |
-| M2 | Sidebar 未読バッジの同期: `useLocation` 依存追加 or storage event |
-| M3 | TanStack Query → 将来 `onSnapshot` 化（複数管理者の同時操作対応） |
-| M4 | `feedback update + admin_logs` を `writeBatch` で原子化 |
-| M5 | 未使用 Firestore index に注記 or 削除（`feedbacks` の status / category 複合） |
-| M6 | バナーのモバイル `@media` 対応 |
-| M7 | localStorage `lastSeen` の改ざん耐性（不正バージョン弾く） |
-
-### 後続フェーズ
-
-- **CI 整備**: GitHub Actions で `pnpm lint` + `pnpm test:rules` + `pnpm test` 実行 + Pages preview deploy
-- **本番 seed スクリプト**: tags / 初期管理者 / changelog 等の本番投入手順
-- **R2 検討**: 添付・アバター機能を有効化したくなった時の Storage 代替
-
----
-
-## 過去セッション
-
-- **session 1-4**: 基本機能（PoC・seed・E2E・auth・URL/Q&A/notes/apps）
-- **session 5**: お知らせ + フィードバック（PR #1）
-- **session 6**: CSS 修正 + Cloudflare Workers 移行 + 本人削除 UI + コードレビュー対応（PR #1, #2）
-- **session 7**: Cloudflare Pages デプロイ → 完全クラウド構成完了
-
----
-
-## セッション 6 までの内容（archive）
-
-### 今回やったこと（セッション 6）
-
-### 1. CSS バグ修正
-
-#### アクセント色（amber/indigo/forest）追従不具合
-`extra.css` 内 11 箇所で border 等が `oklch(0.85 0.10 65)` のように **hue 65（amber）にハードコード**されており、Tweaks のアクセント切り替えで枠線だけ amber 固定だった問題を `var(--accent)` に置換。
-
-対象: `.announcements-banner`（light/dark）/ `.status-badge[data-status='採用候補']` / `.comment-type[data-type='improve']` / `.accepted-mark` / `.answer-item.is-accepted` / `.me-tab.is-active .me-tab-count` / `.admin-row-self`（light/dark）/ `.announcements-entry-badge.feedback` / `.feedback-cat.active`（light/dark）
-
-`.topbar-warn` は警告セマンティック色なのでアンバー固定のまま温存。
-
-#### マイページの行レイアウト崩れ
-`extra.css:1277-1287` の `.me-row` 上書き定義（`grid-template-columns: 1fr auto`、2 カラム）が JSX の 3 children 構造（icon / content / actions）と整合せず、タイトル長によって左右にぶれていた問題を修正。`.me-row-main` / `.me-row-actions` は完全な dead code（JSX のどこからも参照されていない）として削除。`globals.css:1343-1379` の `auto 1fr auto` 定義が単独適用される正しい状態に。
-
-#### お知らせバナーの縦幅コンパクト化
-50px → 32px（padding 10→4 / font 13→12 / icon 18→13 / radius 10→6）。
-
-#### 管理者タグ追加ボタンの視認性
-ボタンは元から実装されていたが（`TagsTab.tsx:144`）、`btn sm` グレー枠でフィルタチップ群と紛れ「機能がない」と見落とされていた。`btn-primary`（黒背景）+ ラベル「タグを追加」+ `aria-label` で改善。
-
-### 2. 自分の投稿を本人削除する UI
-
-`src/components/me/DeleteOwnButton.tsx` を新設。MyPage の URL / 質問 / 検証メモ / 作成アプリの 4 行に「削除」ボタン追加。Firestore Rules では `ownerOf(resource.data) || isAdmin()` で本人削除は元から許可されていたが UI が無かった。
-
-ConfirmDialog 経由で削除確認、確定で `linksDb.remove` 等を呼ぶ。**本人削除は `admin_logs` に記録しない**設計（個人情報の自己管理権、管理者削除とは経路を分離）。
-
-### 3. Cloudflare Workers + Firebase 本番接続（最大の変更）
-
-PoC を本番運用可能な構成にするための基盤整備。og-proxy（Express on Docker）を **Cloudflare Workers** に移植 + **Firebase Spark** に直接接続するハイブリッド構成を整備。
-
-#### なぜこの構成にしたか
-
-学院 LAN ホスティング案で詰まった点:
-- mkcert root CA を学内 MDM で配布できない
-- 学院 DNS / 内部 PKI も使えない
-- 結果として HTTP 運用しかなく「保護されていません」表示問題が解消できなかった
-
-→ **クラウドに寄せる**選択。Vercel Hobby は ToS 上「商用」グレーゾーンなので **Cloudflare** へ。
-
-#### 実装内容
-
-`cloudflare/og-worker/`:
-- **Hono** で Express 互換ルーティング
-- **jose** で Firebase ID Token を直接検証（`firebase-admin` 不使用、Workers の Node 互換性問題回避）
-- **HTMLRewriter** で OG メタ抽出（`cheerio` 不使用、Workers ストリーム処理で CPU 1-3ms）
-- **Web Crypto** で GCS V4 署名を実装（Storage 用、option B では未通電）
-- バンドル 145 KiB / gzip 35 KiB / 起動 17ms（無料枠 10ms CPU 内）
-- 配信先: `https://aidev-og-worker.ipc-claudeapps001.workers.dev`
-
-#### Firebase 本番側
-
-- Spark プラン、project=`aidevknowledge-app`
-- Authentication（メール/パスワード）+ Firestore（`asia-northeast1`）
-- **Storage は Spark で使用不可**のため未有効化（**option B**: 添付・アバター機能は PoC では非対応）
-- Service Account 鍵は **学院 Workspace ポリシー（`iam.disableServiceAccountKeyCreation`）で生成不可**のため、Web App 追加・テストユーザー作成は Console UI で手動運用
-
-#### 開発と本番の並走
-
-開発環境（Emulator）と本番（クラウド）は完全独立で並走可能:
-- `pnpm dev`: `.env` を読み Emulator 接続（従来通り）
-- `pnpm build --mode production`: `.env.production` + `.env.production.local` を読み実 Firebase + Worker 接続
-
-### 4. Code Review 対応 2 ラウンド
-
-#### セッション 6 自体のレビュー（コミット 0bd4725 系）
-- **HIGH** og-fetcher SSRF: `redirect: 'follow'` → `'manual'` で各ホップ検証、メタデータ IP 169.254.169.254 等を REJECT 一覧に追加
-- **MEDIUM** auth.ts: `clockTolerance: '5s'` + `iat` 未来チェック追加
-- 改善: `app.use('/api/*', requireAuth)` で一括適用、ラッパ撤廃
-
-#### セッション 5（announcements + feedback）の遅延レビュー → PR #2
-- **H1**: 「一方向 → 双方向」遷移化の遺物をコメント・UI 文言・dead code 注記から一掃
-- **H2**: feedbacks Rules の create 検証を強化
-  - `userHandleSnap`（string + 32 字上限）/ `userNameSnap`（64 字）/ `currentView`（256 字）/ `updatedAt == request.time` を Rules で検証
-- **H3**: FeedbackFab に `aria-modal="true"` + `aria-labelledby` + 閉じ後の FAB フォーカス復帰
-- Rules テスト 16 → 22 ケース（H2 検証ポイント網羅）
-
----
-
-## 検証結果（セッション 6 累積）
-
-- ✅ `pnpm lint`（tsc）PASS
-- ✅ `pnpm test:rules` 82/82 PASS
-- ✅ `pnpm test`（unit）62/62 PASS
-- ✅ Cloudflare Worker `tsc --noEmit` PASS
-- ✅ `wrangler deploy` 成功（145 KiB, 17ms 起動）
-- ✅ `verify-cf-worker.mjs` end-to-end PASS（Firebase Auth → Worker /api/og）
-- ✅ `verify-announcements-feedback.mjs` 20/20 PASS
-- ✅ `verify-banner-accent.mjs` 3 アクセントで hue distinct PASS
-- ✅ `verify-mypage-row-layout.mjs` 3 カラム適用 PASS
-- ✅ `verify-delete-own.mjs` 削除 UI 動作 PASS
-- ✅ `verify-tag-create-ui.mjs` タグ追加フォーム展開 PASS
-
----
-
-## 重要な決定事項（セッション 6 で確定）
-
-### 構成方針
-
-| 領域 | 決定 |
-|---|---|
-| **og-proxy 本番先** | Cloudflare Workers (`cloudflare/og-worker/`)。Docker 版は dev 専用 |
-| **データレイヤ** | Firebase Spark（Auth + Firestore）。Blaze は当面不要 |
-| **Storage 本番** | Spark で使用不可、PoC は **option B**（添付なし）。将来は **R2 検討**（Blaze 回避＆エグレス無料） |
-| **SPA 本番ホスティング** | Cloudflare Pages（次フェーズ予定、未デプロイ） |
-| **Service Account 鍵** | 学院ポリシーで生成不可。Console UI 手動運用前提 |
-| **本番 SSL/ドメイン** | Cloudflare 任せ（`*.workers.dev` / `*.pages.dev`）。学内 LAN 限定の HTTPS 化交渉は不要に |
-
-### Worker 実装の方針
-
-- **firebase-admin SDK は使わない** → `jose` で Google JWKs から直接検証
-- **cheerio は使わない** → Cloudflare の `HTMLRewriter`（SAX ストリーム処理）
-- **GCS 署名は自作** → `crypto.subtle` で V4 RSA-SHA256 を直接組み立て
-- **レート制限** → `RATE_LIMITER` binding 利用（未バインドなら skip）
-- **redirect は follow せず manual** → 各ホップで `isRejectedHost` 再チェック
-
-### 本人削除 UI
-
-- **`admin_logs` には記録しない**（個人情報の自己管理権）
-- 管理者削除（Moderation タブ）は引き続き `admin_logs` に記録
-- **論理削除ではなく完全削除**（ゴミ箱機能は MVP 対象外）
-
-### セキュリティ
-
-- **API トークン・サービスアカウント秘密鍵は user-visible 出力に書かない**（チャット・log 等含めて全文禁止、長さやプレフィックスのみ可）。経緯はメモリ `feedback_secrets_in_output.md` に記録
-- **`.env.production.local` は gitignore 済**（Firebase Web 設定を保持）
-- **`secrets/` ディレクトリも gitignore 済**（サービスアカウント JSON 想定）
-
----
-
-## 捨てた選択肢と理由（セッション 6 分）
-
-### LAN ホスティング HTTPS 化
-- **却下**: mkcert + root CA 配布が学内 MDM 不在で運用困難 / 学院 DNS / 内部 PKI も無し → HTTP 運用「保護されていません」表示が不可避
-- **採用**: クラウド寄せ（Cloudflare Workers + Pages）
-
-### Vercel Hobby
-- **却下**: ToS 上「非商用」限定、学内業務利用はグレー
-- **採用**: Cloudflare（無料プランでも商用 OK）
-
-### Firebase Storage（Blaze 移行）
-- **却下**: 課金事故対策の運用負荷 + 50 人規模では過剰
-- **採用**: Spark + option B（添付なし）。将来必要なら R2
-
-### サービスアカウント鍵で Web App 自動作成
-- **却下**: 学院 Google Workspace ポリシーで鍵生成不可
-- **採用**: Console UI で手動。`tools/scripts/firebase-{create-user,setup-webapp}.mjs` は将来用に温存（コメント明記）
-
-### `admin_logs` に本人削除も記録
-- **却下**: 自己管理権の観点で、自分の投稿を消すのは監査対象外
-- **採用**: 管理者削除のみ記録、本人削除は痕跡なし。なりすまし対策が必要な場合は将来 `deletion_audit` コレクション追加で対応
-
----
-
-## 残タスク（優先度別）
-
-### 次セッションで対応推奨（session 7 時点の更新）
-
-1. ~~**Cloudflare Pages に SPA をデプロイ**~~ — **session 7 で完了**（`https://aidev-knowledge-hub.pages.dev`）
-2. **本番 Firestore に管理者ユーザーのプロファイルレコードを投入** — Auth 作成後に自動で `users/{uid}` を作る trigger が無いので手動 or seed スクリプトの本番版が必要
-
-### MEDIUM 課題（session 5 レビュー由来、将来対応）
-
-| # | 内容 |
-|---|---|
-| M1 | FeedbackTab の `alert()` を共通 Toast に統一 |
-| M2 | Sidebar 未読バッジの同期: `useLocation` 依存追加 or storage event |
-| M3 | TanStack Query → 将来 `onSnapshot` 化（複数管理者の同時操作対応） |
-| M4 | `feedback update + admin_logs` を `writeBatch` で原子化 |
-| M5 | 未使用 Firestore index に注記 or 削除（`feedbacks` の status / category 複合） |
-| M6 | バナーのモバイル `@media` 対応 |
-| M7 | localStorage `lastSeen` の改ざん耐性（不正バージョン弾く） |
-
-### Cloudflare Worker 関連（option 拡張時）
-
-- **storage.ts の objectKey エンコード修正** — 通電前必須（`/` 保持の split-encodeURIComponent）
-- **GCS V4 署名の Vitest 単体テスト** — 通電前必須
-- **verify-cf-worker.mjs の UTF-16 LE 対応** — 環境ファイル読み出し堅牢化
-- **CORS origin 正規化** — trailing slash 対応
-
-### LOW 課題
-
-- 絵文字利用ルールの整理（コード内の 💬 / ✨ / 💡 / 🔧 / 🔒）
-- announcements-storage.ts の getter/setter テスト
-- `formatReleaseDate` の異常系テスト
-- `INVALID_TRANSITION` 文字列ベース判定をカスタムエラー化
-
-### 後続フェーズ
-
-- **CI 整備**: GitHub Actions で `pnpm lint` + `pnpm test:rules` 実行
-- **ngrok / Cloudflare Tunnel** 検討（学内デモ用、必要なら）
-- **本番 seed スクリプト**: tags / 初期管理者 / changelog 等の本番投入手順
-- **本番運用ドキュメント**: `docs/runbooks/prod-deploy.md` の作成
-
----
-
-## 次セッションへの注意点
-
-### テストアカウント
-
-#### Emulator（dev）
-詳細は [docs/runbooks/test-accounts.md](docs/runbooks/test-accounts.md)。全員パスワード `testtest`。
-- `sato.k@example.ac.jp`（**管理者**、private データあり）
-- `matsuoka.m@example.ac.jp`（情報支援、採用済み回答 a3-1 の作者）
-- `kimura.r@example.ac.jp`（DX推進、解決済み質問 q3 の作者）
-
-#### 本番 Firebase（aidevknowledge-app）
-- `test@example.com` / `testtest123`（手動作成済、ロールなし）
-
-### Cloudflare 関連
-
-- **API トークン**: `cloudflare/og-worker/.env.local`（gitignore 済、UTF-16 LE）
-- **デプロイ**: `docker compose exec -T -e CLOUDFLARE_API_TOKEN="$TOKEN" app sh -c "cd /app/cloudflare/og-worker && pnpm exec wrangler deploy"`
-- **Docker 内 wrangler dev は不可**（glibc 古く workerd が動かない）。`wrangler deploy` は OK
-- **Worker URL**: `https://aidev-og-worker.ipc-claudeapps001.workers.dev`
-- **Cloudflare アカウント**: `lpc_claudeapps001@kobegakuin.ac.jp` / Account ID `8379b276f1aef2938adb33c3442d1e66`
-
-### Vite / Firestore 既知の留意点
-
-- **Vite HMR**: `usePolling: true, interval: 5000ms`。500ms に下げると CPU 飽和 + HTML 応答遅延
-- **TanStack Query v5 `enabled:false` で `isPending:true`**: ロード判定は `isFetching` を使う
-- **Firestore は `ignoreUndefinedProperties: true`**（`src/lib/firebase/client.ts`）
-- **emulator restart で rules リロード**: rules 編集後は `docker compose restart firebase-emulator` + 再 seed が必要
-- **ホストポートは +200 シフト**: Auth 9299 / Firestore 8280 / UI 4200 / og-proxy 8987
-- **Emulator データは揮発する**: ログイン不能の第一容疑者。`docker compose exec app pnpm seed` で復旧
-
-### Vite dev サーバの遅さ
-
-Docker for Windows 上の bind mount IO で初回ロードが 20 秒前後。**PoC では許容**（本番 Cloudflare Pages では数百 ms で配信される）。15s タイムアウトの E2E スクリプトは Step 8 等の deep-link で先に切れることがあるが、curl では 200 を返す = サーバは正常。
-
-### 過去セッション
-
-- **session 1-4**: 基本機能（PoC・seed・E2E・auth・URL/Q&A/notes/apps）
-- **session 5**: お知らせ + フィードバック（PR #1）
-- **session 6**: CSS 修正 + Cloudflare 移行 + 本人削除 UI + コードレビュー対応（PR #1, #2）
+## セッション 10 までの内容（archive）
+
+詳細は git log と各 PR の説明を参照（PR #5 / #6 / #3 等）。直近のアーキテクチャ的決定:
+
+- session 9: PR ベース運用 + CI 3 ジョブ（lint / unit / rules）必須化、Branch protection 導入
+- session 10: パスワード確認入力欄 + 表示トグル UI、Playwright 検証スクリプト 16 シナリオ
+- 本番テストアカウント現状（session 11 末時点）:
+  - `chikuda@j.kobegakuin.ac.jp`（管理者、emailVerified=true 確認済）
+  - `test2@example.com`（DX推進、emailVerified 未確認、削除推奨）
+  - `test@example.com`（users 未 bootstrap、削除推奨）
+
+### 開発環境留意点（変わらず）
+- ホストポートは +200 シフト（Auth 9299 / Firestore 8280 / UI 4200 / og-proxy 8987）
+- Emulator データは揮発、`docker compose exec app pnpm seed` で復旧
+- emulator は test:rules 経由で rules がアップロードされる（test project と dev project が `singleProjectMode` で同 Firestore を共有）
+- `firebase-tools@latest` は Java 21+ 必須（`actions/setup-java@v4` の `java-version: '21'` 維持）
+- 秘密値（CI トークン / 管理者パスワード）は `secrets/` ディレクトリ（gitignore 済）に保存、user-visible 出力には mask() のみ
