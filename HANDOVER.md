@@ -1,13 +1,164 @@
 # セッション引き継ぎノート
 
-> 最終更新: 2026-05-01（セッション 9 / GitHub Actions CI 整備 + Branch protection）
+> 最終更新: 2026-05-01（セッション 10 / SignupPage パスワード入力ミス防止）
 > 現在ブランチ: `main`（origin と同期、main 直 push はブロック中）
 > リモート: https://github.com/chdev777/aidevknowledge-app
-> 直近コミット: `5371bb2 Merge pull request #3 from chdev777/feat/ci-and-pending-work`
+> 直近コミット: `2a15a75 Merge pull request #5 from chdev777/feat/signup-password-confirm`
 
 ---
 
-## 今回やったこと（セッション 9）
+## 今回やったこと（セッション 10）
+
+session 9 で構築した PR ベース運用 + CI を初めて実用したセッション。アカウント作成画面のパスワード入力欄が 1 つしかなく、誤入力するとログイン不能になる問題を解決。**確認入力欄 + 表示トグル** の組み合わせで二重防壁を構築した。
+
+### 1. 採用方針の検討
+
+入力ミス防止には複数のアプローチがあったが、AskUserQuestion で 4 案を preview 付きで提示してユーザに選択してもらい **「確認入力欄 + 表示トグル」** を採用:
+
+| 案 | 採否 | 理由 |
+|---|---|---|
+| 確認入力欄 + 表示トグル | ✅ 採用 | 業界標準で堅牢、二重防壁、コピペ問題も可視化で吸収 |
+| 表示トグルのみ | ❌ | ショルダーサーフィン無防備、入力ミス検出が弱い |
+| 確認入力欄のみ（従来型） | ❌ | コピペで両方貼ると確認の意味が無い |
+| 送信前確認ダイアログ | ❌ | ダイアログがうるさい、UX が低い |
+
+### 2. SignupPage 実装
+
+**`src/pages/SignupPage.tsx`** に追加:
+- state: `passwordConfirm` / `showPassword`（共有 toggle 状態）
+- 派生値: `passwordMatch` (>= 8 文字 + 一致) / `passwordMismatch`（実害あり時のみ true）
+- パスワード行に表示トグルボタンを内包（input 右端 absolute、👁 / 🙈 で状態表示）
+- 確認入力欄も同じ表示トグル状態を共有 → 1 個のクリックで両方切替（操作回数最小化）
+- hint メッセージ「✅ 一致しています」/「❌ パスワードが一致しません」を `aria-live="polite"` で実況
+- submit ボタンは `disabled={submitting || !passwordMatch}` でガード
+- `aria-invalid` / `aria-describedby` / `aria-pressed` を付与
+
+### 3. CSS 追加（`src/extra.css`）
+
+`.auth-password-row` / `.auth-password-toggle` / `.auth-field-hint` を追加。配色:
+- `is-ng`: `oklch(0.45 0.18 25)`（既存 `.auth-error` と同 hue 25 の赤）
+- `is-ok`: `oklch(0.50 0.13 145)`（緑系、hairline 規約に揃う輝度）
+
+`globals.css` は編集禁止規約に従い `extra.css` に集約。
+
+### 4. Playwright 検証スクリプト新設
+
+**`tools/scripts/verify-signup-password.mjs`** で 16 シナリオを自動検証:
+- 初期マスク状態 / 表示トグルの共有切替 / 不一致時の赤メッセージ + disabled / 一致時の緑メッセージ + enabled / 空欄時の中立 / aria-pressed 等
+
+`pnpm dev` 起動後に `node tools/scripts/verify-signup-password.mjs` で再実行可能。将来 SignupPage を触った際の regression 検出に使える。
+
+### 5. CI 経由でマージ
+
+session 9 で構築した PR ベース運用を初実用:
+1. `feat/signup-password-confirm` ブランチで commit
+2. PR #5 作成 → CI 3 ジョブ全 PASS（Lint 21s / Unit 12s / Rules 37s）
+3. verify スクリプト追加 commit を push → CI 再実行 PASS（再実行 23s/13s/43s）
+4. `gh pr merge --merge --delete-branch` でマージ
+
+セッション 9 の Branch protection（required status checks）が機能していることを実機確認した。
+
+---
+
+## 検証結果（セッション 10）
+
+- ✅ ローカル `pnpm lint` PASS
+- ✅ ローカル `pnpm test` 71/71 PASS
+- ✅ ローカル `pnpm test:rules` 82/82 PASS
+- ✅ ローカル `node tools/scripts/verify-signup-password.mjs` 16/16 PASS
+- ✅ GitHub Actions CI（PR #5）3/3 ジョブ PASS（2 回実行とも）
+- ✅ PR #5 マージ完了（merge commit `2a15a75`）
+
+---
+
+## 重要決定事項（セッション 10 で確定）
+
+### LoginPage は対象外
+
+ログインは間違えても再試行できるので UX 重量化のメリットが小さい。表示トグルだけ追加する案もあるが今回は見送り、`LoginPage.tsx` は変更なし。
+
+### Zod スキーマは新設しない
+
+パスワード検証は等値比較のみで Zod の利点（refine / pipe / transform）を活かす場面が無く、HTML5 `minLength={8}` + React state 検証で十分。Firebase Auth 側の検証も二重防壁になる。
+
+### React Testing Library は導入しない
+
+現状 `src/test/unit/` は `*.spec.ts`（環境 `node`）で React component testing 環境は未整備。本タスクのために RTL を導入するのは scope creep。代わりに **Playwright 検証スクリプト** で UI 挙動をカバーする方針を採用。これは既存の `verify-*.mjs` パターンと整合する（`verify-banner-accent.mjs` 等）。
+
+### ラベル内のボタン配置の懸念
+
+`<label className="auth-field">` の中に `<button>`（toggle）と `<input>` を入れるのは MDN 上 anti-pattern とされている（スクリーンリーダー利用者が input をアクティベートしづらい）が:
+- `<button type="button">` で submit を防止
+- 既存フィールドのラベル構造（implicit label）を破壊しないため統一性優先
+- aria-label / aria-pressed で代替アクセシビリティ確保
+- Playwright 検証で実挙動 PASS 確認済
+
+問題が顕在化したら explicit `<label htmlFor>` 構造への切替を検討。
+
+---
+
+## 残タスク（次セッション以降）
+
+### 本番運用上の to-do
+
+1. **管理 UI で 2 人目管理者付与の実機確認** — chikuda ログイン → 別ユーザを `管理者` に昇格できるか実機確認
+2. **本番 seed の本格版** — tags / 初期 announcements / changelog の投入
+3. **`actions/setup-node@v4` 等の Node.js 24 対応** — 2026-09-16 までに対処
+4. **`FIREBASE_TOKEN` の半年ローテーション** — 目安 2026-11-01
+
+### MEDIUM 課題（session 5 由来、引き続き）
+
+| # | 内容 |
+|---|---|
+| M1 | FeedbackTab の `alert()` を共通 Toast に統一 |
+| M2 | Sidebar 未読バッジの同期: `useLocation` 依存追加 or storage event |
+| M3 | TanStack Query → 将来 `onSnapshot` 化（複数管理者の同時操作対応） |
+| M4 | `feedback update + admin_logs` を `writeBatch` で原子化 |
+| M5 | 未使用 Firestore index に注記 or 削除（`feedbacks` の status / category 複合） |
+| M6 | バナーのモバイル `@media` 対応 |
+| M7 | localStorage `lastSeen` の改ざん耐性（不正バージョン弾く） |
+
+### 後続フェーズ
+
+- **R2 検討**: 添付・アバター機能を有効化したくなった時の Storage 代替
+- **CI に E2E 追加**（`verify-*.mjs` 群を Playwright Test に集約してジョブ化、PR で UI regression 検出）
+
+---
+
+## 次セッションへの注意点（セッション 10 で更新）
+
+### 検証スクリプトの活用パターン
+
+`tools/scripts/verify-*.mjs` は Playwright で UI を直接叩く小規模 E2E。`pnpm dev` 起動済前提:
+```bash
+docker compose up -d
+docker compose exec app pnpm dev   # 別シェル or background
+node tools/scripts/verify-signup-password.mjs
+```
+
+**現状 CI には組み込まれていない**（dev server 起動が必要なため）。将来 GitHub Actions に組み込む場合は `pnpm preview` または静的ビルド + `serve` 経由が候補。
+
+### SignupPage の他画面への波及確認
+
+このセッションでは `LoginPage.tsx` は意図的に変更していない。もし「ログインも表示トグル欲しい」という要望が出たら、`SignupPage.tsx` の toggle ボタン部分をそのまま流用可能（ただし `LoginPage` の input にも `.auth-password-row` ラッパが必要）。
+
+---
+
+## 過去セッション
+
+- **session 1-4**: 基本機能（PoC・seed・E2E・auth・URL/Q&A/notes/apps）
+- **session 5**: お知らせ + フィードバック（PR #1）
+- **session 6**: CSS 修正 + Cloudflare Workers 移行 + 本人削除 UI + コードレビュー対応（PR #1, #2）
+- **session 7**: Cloudflare Pages デプロイ → 完全クラウド構成完了
+- **session 8**: 本番 Firestore 立ち上げ（Rules / indexes デプロイ）+ 初期管理者投入
+- **session 9**: GitHub Actions CI 整備 + Branch protection
+- **session 10**: SignupPage パスワード入力ミス防止（確認入力欄 + 表示トグル）
+
+---
+
+## セッション 9 までの内容（archive）
+
+### 今回やったこと（セッション 9）
 
 session 8 で残タスクとして挙がっていた **CI 整備** を実施。GitHub Actions で `lint` / `unit-test` / `rules-test` の自動チェック + `firestore.rules` / `firestore.indexes.json` の自動デプロイを構築し、Branch protection も設定した。
 
@@ -159,7 +310,7 @@ main 直 push が hook でブロックされたため、`feat/ci-and-pending-wor
 
 ---
 
-## 過去セッション
+## 過去セッション（session 9 視点・archive）
 
 - **session 1-4**: 基本機能（PoC・seed・E2E・auth・URL/Q&A/notes/apps）
 - **session 5**: お知らせ + フィードバック（PR #1）
