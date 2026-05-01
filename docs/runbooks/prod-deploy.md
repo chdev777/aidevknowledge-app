@@ -91,6 +91,41 @@ API 経由ではなく Console UI で対応（Service Account 鍵が学院ポリ
 Auth 作成だけでは `users/{uid}` レコードが無いので SPA からは初回サインイン時に bootstrap される（`src/lib/firebase/bootstrap-user.ts`）。
 管理者ロール付与は Console の Firestore エディタから手動で `role: '管理者'` を立てる。
 
+### tags マスタ投入（初回のみ）
+
+23 種の初期タグ（`RAG` / `Dify` / `Claude` / `FAQ検索` など）を Firestore に投入。Rules で `tags.write` は管理者のみ許可されているため、管理者ロールのアカウントでログインして REST 経由で投入する。
+
+スクリプトは Node 標準ライブラリのみ（`fetch` / `node:fs` / `node:util`）で実装されているため、**ホストの Node 18+ で直接実行できる**（Docker 不要）:
+
+```bash
+# 管理者パスワードを secrets/ に保存（gitignore 済）
+printf '%s' '<password>' > secrets/admin-password.txt
+
+# dry-run（書き込みなし、認証と isAdmin 確認のみ）
+node tools/scripts/seed-prod-tags.mjs \
+  --email <admin-email> \
+  --password-file secrets/admin-password.txt \
+  --dry-run
+
+# 本番投入
+node tools/scripts/seed-prod-tags.mjs \
+  --email <admin-email> \
+  --password-file secrets/admin-password.txt
+```
+
+スクリプトは idempotent なので再実行で既存 tag を上書き更新する。`tools/scripts/seed.ts` の `TAGS` 配列と同期して保つこと（双方手動編集）。
+
+### お知らせ（changelog）の追加
+
+`announcements` / `changelog` は Firestore 投入ではなく **`src/lib/data/changelog.ts` の静的バンドル**に追記するだけ。先頭が最新リリース。追記後、再ビルド + Cloudflare Pages 再デプロイで反映（`deploy-pages.sh` は wrangler を使うため Docker 経由）:
+
+```bash
+export CLOUDFLARE_API_TOKEN=$(cat cloudflare/og-worker/.env.local | grep CLOUDFLARE_API_TOKEN | cut -d= -f2)
+docker compose exec -T -e CLOUDFLARE_API_TOKEN app tools/scripts/deploy-pages.sh
+```
+
+`audience: 'admin'` を付けると一般ユーザーには非表示になる（管理者・運用周りの内容向け）。
+
 ## 4. デプロイ後検証
 
 ```bash
