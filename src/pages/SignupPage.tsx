@@ -11,14 +11,25 @@ export function SignupPage() {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [passwordConfirm, setPasswordConfirm] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [name, setName] = useState('');
   const [handle, setHandle] = useState('');
   const [role, setRole] = useState<UserRole>('DX推進');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const passwordMatch =
+    password.length >= 8 && passwordConfirm.length >= 8 && password === passwordConfirm;
+  const passwordMismatch =
+    password.length >= 8 && passwordConfirm.length > 0 && password !== passwordConfirm;
+
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    if (!passwordMatch) {
+      setError('パスワードが一致しません');
+      return;
+    }
     setError(null);
     setSubmitting(true);
     try {
@@ -80,14 +91,64 @@ export function SignupPage() {
           </label>
           <label className="auth-field">
             <span>パスワード <em className="mono">8文字以上</em></span>
-            <input
-              type="password"
-              autoComplete="new-password"
-              minLength={8}
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
+            <div className="auth-password-row">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                autoComplete="new-password"
+                minLength={8}
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+              <button
+                type="button"
+                className="auth-password-toggle"
+                aria-label={showPassword ? 'パスワードを非表示' : 'パスワードを表示'}
+                aria-pressed={showPassword}
+                onClick={() => setShowPassword((v) => !v)}
+              >
+                {showPassword ? '🙈' : '👁'}
+              </button>
+            </div>
+          </label>
+          <label className="auth-field">
+            <span>パスワード（確認）</span>
+            <div className="auth-password-row">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                autoComplete="new-password"
+                minLength={8}
+                required
+                value={passwordConfirm}
+                onChange={(e) => setPasswordConfirm(e.target.value)}
+                aria-invalid={passwordMismatch}
+                aria-describedby="password-confirm-hint"
+              />
+              <button
+                type="button"
+                className="auth-password-toggle"
+                aria-label={showPassword ? 'パスワードを非表示' : 'パスワードを表示'}
+                aria-pressed={showPassword}
+                onClick={() => setShowPassword((v) => !v)}
+              >
+                {showPassword ? '🙈' : '👁'}
+              </button>
+            </div>
+            <div
+              id="password-confirm-hint"
+              className={
+                'auth-field-hint' +
+                (passwordMatch ? ' is-ok' : '') +
+                (passwordMismatch ? ' is-ng' : '')
+              }
+              aria-live="polite"
+            >
+              {passwordMatch
+                ? '✅ 一致しています'
+                : passwordMismatch
+                  ? '❌ パスワードが一致しません'
+                  : ' ' /* レイアウト保持の non-breaking space */}
+            </div>
           </label>
           <fieldset className="auth-field auth-radio-row">
             <legend>所属</legend>
@@ -107,7 +168,11 @@ export function SignupPage() {
 
           {error && <div className="auth-error">{error}</div>}
 
-          <button type="submit" className="btn btn-primary" disabled={submitting}>
+          <button
+            type="submit"
+            className="btn btn-primary"
+            disabled={submitting || !passwordMatch}
+          >
             {submitting ? <Spinner /> : 'アカウント作成'}
           </button>
         </form>
