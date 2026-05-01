@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port 3000",
     "build": "tsc --noEmit && vite build",
+    "build:prod": "tsc --noEmit && tools/scripts/build-prod.sh",
     "preview": "vite preview --host 0.0.0.0",
     "test": "vitest run src/test/unit",
     "test:rules": "vitest run src/test/rules --no-file-parallelism",

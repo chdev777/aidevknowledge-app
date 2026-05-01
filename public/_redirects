@@ -1,0 +1,5 @@
+# Cloudflare Pages SPA fallback
+# React Router の history API モードで `/links/abc` 等の deep link を index.html に流す。
+# Pages のアセット解決優先順は: 静的ファイル > _redirects ルール
+# つまり `/assets/*.js` 等のビルド成果物はこのルールに到達しない。
+/*  /index.html  200

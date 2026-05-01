@@ -1,0 +1,78 @@
+name: Deploy Firestore Rules / Indexes
+
+# main への push で firestore.rules または indexes が変更された時のみデプロイ
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'firestore.rules'
+      - 'firestore.indexes.json'
+      - 'firebase.json'
+      - '.github/workflows/deploy-rules.yml'
+  # 緊急時の手動実行用
+  workflow_dispatch:
+
+# 並走デプロイ防止（後発のみ実行）
+concurrency:
+  group: deploy-rules
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to Firebase
+    runs-on: ubuntu-latest
+    # 必要最小権限で署名（push 不要・read-only）
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '9.12.0'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # デプロイ前に最終チェック（既に CI で確認済だが二重防壁）
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Re-verify rules tests pass
+        env:
+          FIRESTORE_EMULATOR_HOST: 127.0.0.1:8080
+        run: |
+          pnpm dlx firebase-tools@latest emulators:exec \
+            --only firestore \
+            --project aidev-knowledge-test \
+            "pnpm test:rules"
+
+      - name: Deploy firestore rules and indexes
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+          FIREBASE_PROJECT: aidevknowledge-app
+        run: |
+          if [ -z "$FIREBASE_TOKEN" ]; then
+            echo "::error::FIREBASE_TOKEN secret is not set. Register it in repository Secrets first."
+            exit 1
+          fi
+          pnpm dlx firebase-tools@latest deploy \
+            --only firestore:rules,firestore:indexes \
+            --project "$FIREBASE_PROJECT" \
+            --non-interactive
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## Firestore Rules / Indexes Deploy" >> $GITHUB_STEP_SUMMARY
+          echo "- Status: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Project: aidevknowledge-app" >> $GITHUB_STEP_SUMMARY
+          echo "- Commit: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
